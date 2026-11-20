@@ -6,6 +6,9 @@
 
 > 视觉主题：宣纸底色、墨色山水、赤金书法与朱砂印章。
 
+**线上入口**：<https://xhzc66.github.io/secondsalary/>  
+**GitHub 仓库**：<https://github.com/xhzc66/secondsalary>
+
 ![桌面端预览](screenshots/home-ink.png)
 
 ![多人共享总览](screenshots/overview-ink.png)
