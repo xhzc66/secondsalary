@@ -1,0 +1,11 @@
+# Local test artifacts
+_test-deps/
+_test-*.js
+_test-*.csv
+*.local.*
+.wrangler/
+node_modules/
+
+# OS / editor
+.DS_Store
+Thumbs.db

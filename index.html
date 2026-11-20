@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#9f3025">
+  <meta name="description" content="按秒计薪工资计算器：实时累计工资、休息时间扣除、加班费、按月总览，并支持多人加密共享工资簿。数据可保存在本机或通过 KVdb 端到端加密同步。">
+  <title>秒薪 · 按秒计薪工资计算器</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='4' fill='%239f3025'/%3E%3Crect x='4' y='4' width='56' height='56' rx='2' fill='none' stroke='%23f3dfb8' stroke-opacity='.55'/%3E%3Ctext x='32' y='45' text-anchor='middle' font-size='34' font-family='KaiTi,serif' fill='%23f8ead3'%3E%E7%A7%92%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+
+  <div class="app-shell">
+    <header class="site-header">
+      <a class="brand" href="#today" aria-label="秒薪首页">
+        <span class="brand-mark" aria-hidden="true">
+          <span class="brand-seal-char">秒</span>
+        </span>
+        <span class="brand-copy">
+          <span class="brand-name">秒薪</span>
+          <span class="brand-tagline">寸阴寸金</span>
+        </span>
+      </a>
+
+      <nav class="tab-nav" aria-label="主要导航">
+        <button class="tab-button is-active" type="button" data-view="today" aria-current="page">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3.25v13.5M3.25 10h13.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="10" cy="10" r="7.25" stroke="currentColor" stroke-width="1.6"/></svg>
+          今日计薪
+        </button>
+        <button class="tab-button" type="button" data-view="overview">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3.25" y="4.25" width="13.5" height="12.5" rx="2.2" stroke="currentColor" stroke-width="1.6"/><path d="M6.5 2.75v3M13.5 2.75v3M3.25 8h13.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M7 11.5h2M11 11.5h2M7 14h2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          工资总览
+        </button>
+        <button class="tab-button" type="button" data-view="settings">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 6.75A3.25 3.25 0 1 0 10 13.25 3.25 3.25 0 0 0 10 6.75Z" stroke="currentColor" stroke-width="1.6"/><path d="M16.1 11.2a6.8 6.8 0 0 0 0-2.4l1.3-1-1.5-2.6-1.6.6a6.8 6.8 0 0 0-2.1-1.2L12 2.8H9L8.8 4.6a6.8 6.8 0 0 0-2.1 1.2l-1.6-.6-1.5 2.6 1.3 1a6.8 6.8 0 0 0 0 2.4l-1.3 1 1.5 2.6 1.6-.6a6.8 6.8 0 0 0 2.1 1.2l.2 1.8h3l.2-1.8a6.8 6.8 0 0 0 2.1-1.2l1.6.6 1.5-2.6-1.3-1Z" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/></svg>
+          设置
+        </button>
+      </nav>
+
+      <div class="header-meta">
+        <span class="header-clock" id="headerClock" aria-label="当前时间">--:--</span>
+        <button class="storage-chip cloud-chip" id="storageChip" type="button" title="连接或管理共享工资簿" aria-haspopup="dialog">
+          <span class="storage-dot" aria-hidden="true"></span>
+          <span id="storageChipText">共享</span>
+        </button>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- 今日计薪 -->
+      <section class="view is-active" id="view-today" data-view-panel="today" aria-labelledby="todayHeading">
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow"><span id="todayDateLabel">今天</span><span class="eyebrow-separator"></span><span id="todayWeekdayLabel">星期五</span></p>
+            <h1 id="todayHeading">今天的每一秒，<span class="heading-emphasis"><span class="brush-text">都在进账。</span></span></h1>
+          </div>
+          <div class="heading-aside">
+            <span class="save-state" id="saveIndicator">
+              <span class="save-state-dot" aria-hidden="true"></span>
+              <span id="saveIndicatorText">自动保存已开启</span>
+            </span>
+            <p class="heading-note" id="dataScopeNote">本机保存 · 可选加密共享</p>
+          </div>
+        </div>
+
+        <div class="today-grid">
+          <section class="pay-hero" aria-labelledby="liveAmountLabel">
+            <div class="hero-scenery" aria-hidden="true">
+              <span class="hero-sun"></span>
+              <svg class="hero-mountains" viewBox="0 0 900 280" preserveAspectRatio="none" focusable="false">
+                <path d="M0 236 C62 220 96 184 154 196 C212 208 234 166 292 182 C350 198 382 148 442 166 C502 184 524 216 592 200 C660 184 700 146 762 168 C822 190 862 218 900 204 L900 280 L0 280Z" fill="#8a8272" opacity=".21"/>
+                <path d="M0 258 C54 244 82 216 134 226 C186 236 214 192 268 208 C322 224 356 178 412 194 C468 210 506 242 566 226 C626 210 662 174 718 194 C774 214 832 246 900 230 L900 280 L0 280Z" fill="#45453c" opacity=".28"/>
+                <path d="M0 280 C42 270 76 248 122 254 C168 260 206 234 252 244 C298 254 338 228 384 240 C434 252 474 272 530 260 C586 248 624 218 674 234 C724 250 764 270 814 258 C854 248 878 240 900 246 L900 280Z" fill="#1f211b" opacity=".36"/>
+                <path d="M64 214 C168 202 232 214 304 196 C380 178 436 204 502 188" fill="none" stroke="#b4873f" stroke-width="1.2" opacity=".42" stroke-linecap="round"/>
+                <path d="M548 246 C614 236 658 214 710 222 C762 230 818 252 866 242" fill="none" stroke="#b4873f" stroke-width="1" opacity=".34" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="hero-verse" aria-hidden="true">
+              <span class="verse-text">一寸光阴一寸金</span>
+              <span class="verse-seal">日进<br>斗金</span>
+            </div>
+            <div class="hero-topline">
+              <span class="status-pill is-idle" id="statusPill">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span id="statusText">等待开始</span>
+              </span>
+              <span class="hero-date" id="heroDate">--月--日</span>
+            </div>
+
+            <div class="amount-block">
+              <span class="amount-seal" aria-hidden="true">进账</span>
+              <p class="amount-label" id="liveAmountLabel">当前累计工资</p>
+              <div class="amount-line">
+                <span class="amount-currency" aria-hidden="true">¥</span>
+                <span class="amount-value" id="liveAmount">0.00</span>
+              </div>
+              <p class="amount-note" id="amountNote">
+                <span class="note-pulse" id="notePulse" aria-hidden="true"></span>
+                <span id="amountNoteText">点击开始，工资将按秒累计</span>
+              </p>
+            </div>
+
+            <div class="hero-stats">
+              <div class="hero-stat">
+                <span class="hero-stat-label">标准时段累计</span>
+                <strong class="hero-stat-value" id="standardPay">¥0.00</strong>
+                <span class="hero-stat-sub" id="standardMeta">已完成 00:00:00</span>
+              </div>
+              <div class="hero-stat">
+                <span class="hero-stat-label">加班累计</span>
+                <strong class="hero-stat-value is-overtime" id="overtimePay">¥0.00</strong>
+                <span class="hero-stat-sub" id="overtimeMeta">加班 00:00:00</span>
+              </div>
+              <div class="hero-stat">
+                <span class="hero-stat-label">已工作时长</span>
+                <strong class="hero-stat-value is-time" id="workedTime">00:00:00</strong>
+                <span class="hero-stat-sub" id="workedMeta">目标 09:00:00</span>
+              </div>
+              <div class="hero-stat">
+                <span class="hero-stat-label">每秒薪资</span>
+                <strong class="hero-stat-value" id="perSecondRate">¥0.000000</strong>
+                <span class="hero-stat-sub" id="perSecondMeta">加班 ¥0.000000 / 秒</span>
+              </div>
+            </div>
+
+            <div class="shift-progress">
+              <div class="shift-progress-head">
+                <span id="progressLabel">标准工时进度</span>
+                <span class="progress-percent" id="progressPercent">0%</span>
+              </div>
+              <div class="progress-track" id="progressTrack" role="progressbar" aria-label="标准工时进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <span class="progress-fill" id="progressFill"></span>
+                <span class="progress-shine" aria-hidden="true"></span>
+              </div>
+              <div class="shift-progress-foot">
+                <span id="progressFootLeft">标准工时 09:00:00</span>
+                <span id="progressFootRight">超出后按加班规则计费</span>
+              </div>
+            </div>
+
+            <div class="hero-controls">
+              <button class="button button-primary" id="startBtn" type="button">
+                <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M6.2 4.1v9.8l7.5-4.9-7.5-4.9Z" fill="currentColor"/></svg>
+                <span id="startBtnText">开始计薪</span>
+              </button>
+              <button class="button button-ghost" id="pauseBtn" type="button" disabled>
+                <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M6 4.2v9.6M12 4.2v9.6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+                暂停
+              </button>
+              <button class="button button-quiet" id="resetBtn" type="button" disabled>
+                <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M4.1 6.6A6 6 0 1 1 3.3 11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M4.2 2.9v3.9h3.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                重置
+              </button>
+            </div>
+          </section>
+
+          <aside class="day-panel" aria-labelledby="dayPanelHeading">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-eyebrow">今日筹备</p>
+                <h2 id="dayPanelHeading">今日工作配置</h2>
+              </div>
+              <div class="panel-badges">
+                <span class="member-badge" id="dayMemberBadge" hidden>成员</span>
+                <span class="panel-badge" id="crossDayBadge" hidden>跨天</span>
+              </div>
+            </div>
+            <p class="panel-intro">调整会立即用于今日计算，明天沿用设置中的默认值。</p>
+
+            <div class="field-group">
+              <label class="field-label" for="dailyWageInput">每日基本工资</label>
+              <div class="money-field">
+                <span class="money-prefix">¥</span>
+                <input class="text-input money-input" id="dailyWageInput" type="number" inputmode="decimal" min="0.01" max="10000000" step="0.01" autocomplete="off" aria-describedby="dailyWageHint wageError">
+                <span class="money-suffix">元 / 天</span>
+              </div>
+              <p class="field-hint" id="dailyWageHint">标准工作时段内的全天基本工资</p>
+              <p class="field-error" id="wageError" hidden></p>
+            </div>
+
+            <div class="field-group">
+              <div class="field-label-row">
+                <span class="field-label">每日工作时间段</span>
+                <span class="duration-chip" id="standardDuration">9 小时 00 分</span>
+              </div>
+              <div class="time-range">
+                <label class="time-field">
+                  <span>开始</span>
+                  <input class="text-input" id="workStartInput" type="time" step="60" aria-label="工作开始时间">
+                </label>
+                <span class="time-arrow" aria-hidden="true">
+                  <svg viewBox="0 0 24 12" fill="none"><path d="M1 6h21m-5-5 5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                <label class="time-field">
+                  <span>结束</span>
+                  <input class="text-input" id="workEndInput" type="time" step="60" aria-label="工作结束时间">
+                </label>
+              </div>
+              <p class="field-hint">结束时间早于开始时间时，将自动按跨天班次计算。</p>
+              <p class="field-error" id="timeError" hidden></p>
+
+              <div class="break-inline">
+                <label class="break-toggle">
+                  <input id="breakToggle" type="checkbox" role="switch" aria-label="扣除休息时间">
+                  <span class="break-checkbox" aria-hidden="true"></span>
+                  <span>扣除休息</span>
+                </label>
+                <div class="break-times" id="breakFields" hidden>
+                  <input class="break-time-input" id="breakStartInput" type="time" step="60" aria-label="休息开始时间" aria-describedby="breakHint breakError">
+                  <span class="break-dash" aria-hidden="true">—</span>
+                  <input class="break-time-input" id="breakEndInput" type="time" step="60" aria-label="休息结束时间" aria-describedby="breakHint breakError">
+                </div>
+                <span class="break-off-label" id="breakOffLabel">未扣除</span>
+              </div>
+              <p class="field-hint break-hint" id="breakHint">开启后从标准工时中扣除休息时间；休息时请暂停计时。</p>
+              <p class="field-error" id="breakError" hidden></p>
+            </div>
+
+            <div class="overtime-box">
+              <div class="overtime-box-head">
+                <div>
+                  <span class="field-label">今日是否加班</span>
+                  <p class="field-hint">完成标准工时后是否继续累计加班费</p>
+                </div>
+                <label class="switch" for="overtimeToggle">
+                  <input id="overtimeToggle" type="checkbox" role="switch" aria-label="今日是否加班">
+                  <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+                </label>
+              </div>
+              <div class="overtime-rule">
+                <span class="rule-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none"><path d="M10 2.8v14.4M4.2 7.1 10 2.8l5.8 4.3M4.2 12.9 10 17.2l5.8-4.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                <div>
+                  <strong id="overtimeRuleText">1.5 倍时薪</strong>
+                  <span id="overtimeRuleDetail">超出标准工时后，每秒按 1.5 倍计算</span>
+                </div>
+                <button class="inline-link" id="settingsLink" type="button">修改规则</button>
+              </div>
+            </div>
+
+            <div class="day-potential" id="dayPotential">
+              <div>
+                <span>完整标准工时可得</span>
+                <strong id="dayBasePotential">¥300.00</strong>
+              </div>
+              <div class="day-potential-rule">
+                <span>加班参考</span>
+                <b id="dayOtPotential">+¥50.00 / 时</b>
+              </div>
+            </div>
+
+            <div class="day-panel-foot">
+              <span class="mini-note">
+                <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.8 13 4v3.6c0 3.1-2.1 5.4-5 6.6-2.9-1.2-5-3.5-5-6.6V4l5-2.2Z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/><path d="m5.8 7.9 1.5 1.5 3-3.1" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                自动保存
+              </span>
+              <button class="text-button" id="jumpOverviewBtn" type="button">查看工资总览 <span aria-hidden="true">→</span></button>
+            </div>
+          </aside>
+        </div>
+
+        <section class="formula-strip" aria-label="计薪说明">
+          <div class="formula-item">
+            <span class="formula-index">壹</span>
+            <div><strong>标准秒薪</strong><p>每日基本工资 ÷ 标准工作秒数</p></div>
+          </div>
+          <div class="formula-item">
+            <span class="formula-index">贰</span>
+            <div><strong>自动切换加班</strong><p>计时超过标准工时后启用加班费规则</p></div>
+          </div>
+          <div class="formula-item">
+            <span class="formula-index">叁</span>
+            <div><strong>精确到厘</strong><p>内部以高精度整数计算，展示保留 2 位小数</p></div>
+          </div>
+          <div class="formula-item">
+            <span class="formula-index">肆</span>
+            <div><strong>本地持久化</strong><p>刷新、关闭页面后记录仍然保留</p></div>
+          </div>
+        </section>
+      </section>
+
+      <!-- 工资总览 -->
+      <section class="view" id="view-overview" data-view-panel="overview" aria-labelledby="overviewHeading" hidden>
+        <div class="view-heading overview-heading">
+          <div>
+            <p class="eyebrow"><span>月度账簿</span><span class="eyebrow-separator"></span><span>按月汇总</span></p>
+            <h1 id="overviewHeading">把每一天的付出，<span class="heading-emphasis"><span class="brush-text">记得清清楚楚。</span></span></h1>
+          </div>
+          <div class="heading-aside">
+            <p class="heading-note">基本工资与加班费分开统计</p>
+          </div>
+        </div>
+
+        <div class="overview-toolbar">
+          <div class="month-switcher" aria-label="选择统计月份">
+            <button class="icon-button" id="prevMonthBtn" type="button" aria-label="上个月">
+              <svg viewBox="0 0 18 18" fill="none"><path d="m11 4-5 5 5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <label class="month-picker-wrap">
+              <span class="sr-only">统计月份</span>
+              <input class="month-picker" id="monthPicker" type="month">
+            </label>
+            <button class="icon-button" id="nextMonthBtn" type="button" aria-label="下个月">
+              <svg viewBox="0 0 18 18" fill="none"><path d="m7 4 5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="month-today-button" id="currentMonthBtn" type="button">本月</button>
+          </div>
+          <label class="member-filter" id="memberFilterWrap" hidden>
+            <span class="member-filter-label">查看</span>
+            <select class="member-filter-select" id="memberFilter">
+              <option value="me">我的记录</option>
+              <option value="all">全部成员</option>
+            </select>
+          </label>
+          <div class="toolbar-actions">
+            <span class="record-count" id="recordCount">0 条记录</span>
+            <button class="button button-export" id="exportCsvBtn" type="button">
+              <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M9 2.5v9.2M5.4 8.3 9 11.9l3.6-3.6M3 14.9h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              导出 CSV
+            </button>
+          </div>
+        </div>
+
+        <div class="summary-grid">
+          <article class="summary-card summary-card-total">
+            <div class="summary-card-top">
+              <span class="summary-label">当月总计</span>
+              <span class="summary-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M4 16V8m4 8V4m4 12v-6m4 6V6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              </span>
+            </div>
+            <strong class="summary-value" id="summaryTotal">¥0.00</strong>
+            <p class="summary-sub" id="summaryTotalSub">还没有计时记录</p>
+            <div class="summary-total-glow" aria-hidden="true"></div>
+          </article>
+          <article class="summary-card">
+            <div class="summary-card-top">
+              <span class="summary-label">基本工资合计</span>
+              <span class="summary-chip">基本</span>
+            </div>
+            <strong class="summary-value" id="summaryBase">¥0.00</strong>
+            <p class="summary-sub" id="summaryBaseSub">标准时段收入</p>
+          </article>
+          <article class="summary-card">
+            <div class="summary-card-top">
+              <span class="summary-label">加班工资合计</span>
+              <span class="summary-chip is-gold">加班</span>
+            </div>
+            <strong class="summary-value" id="summaryOt">¥0.00</strong>
+            <p class="summary-sub" id="summaryOtSub">加班时段收入</p>
+          </article>
+          <article class="summary-card">
+            <div class="summary-card-top">
+              <span class="summary-label">出勤天数</span>
+              <span class="summary-chip is-neutral">出勤</span>
+            </div>
+            <strong class="summary-value"><span id="summaryDays">0</span><small> 天</small></strong>
+            <p class="summary-sub" id="summaryDaysSub">共 0 小时 0 分</p>
+          </article>
+        </div>
+
+        <div class="composition-card">
+          <div class="composition-head">
+            <div>
+              <span class="composition-title">收入构成</span>
+              <span class="composition-month" id="compositionMonth">--</span>
+            </div>
+            <span class="composition-total" id="compositionTotal">合计 ¥0.00</span>
+          </div>
+          <div class="composition-track" aria-hidden="true">
+            <span class="composition-base" id="compositionBase"></span>
+            <span class="composition-ot" id="compositionOt"></span>
+          </div>
+          <div class="composition-legend">
+            <span><i class="legend-dot is-base"></i>基本工资 <b id="compositionBasePct">0%</b></span>
+            <span><i class="legend-dot is-ot"></i>加班工资 <b id="compositionOtPct">0%</b></span>
+          </div>
+        </div>
+
+        <section class="records-card" aria-labelledby="recordsHeading">
+          <div class="records-head">
+            <div>
+              <h2 id="recordsHeading">每日明细</h2>
+              <p id="recordsSubhead">按日期从早到晚排列</p>
+            </div>
+            <span class="records-month-label" id="overviewMonthLabel">--</span>
+          </div>
+
+          <div class="table-wrap" id="tableWrap">
+            <table class="records-table" id="recordsTable">
+              <thead>
+                <tr>
+                  <th scope="col">日期</th>
+                  <th scope="col">工时明细</th>
+                  <th scope="col" class="num">基本工资</th>
+                  <th scope="col" class="num">加班工资</th>
+                  <th scope="col" class="num">当日合计</th>
+                  <th scope="col"><span class="sr-only">操作</span></th>
+                </tr>
+              </thead>
+              <tbody id="recordsBody"></tbody>
+            </table>
+          </div>
+
+          <div class="empty-state" id="emptyState" hidden>
+            <div class="empty-illustration" aria-hidden="true">
+              <span class="empty-coin">¥</span>
+              <span class="empty-clock">
+                <svg viewBox="0 0 52 52" fill="none"><circle cx="26" cy="26" r="19" stroke="currentColor" stroke-width="2"/><path d="M26 15v11l7 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+            </div>
+            <h3>这个月还没有工资记录</h3>
+            <p>去「今日计薪」开始计时，每一秒都会被自动记录。</p>
+            <button class="button button-primary is-small" type="button" data-go-today>去开始计时</button>
+          </div>
+
+          <div class="records-foot">
+            <span>仅展示有计时记录的日期 · 金额自动保存</span>
+            <span class="records-foot-note">删除记录不可恢复</span>
+          </div>
+        </section>
+      </section>
+
+      <!-- 设置 -->
+      <section class="view" id="view-settings" data-view-panel="settings" aria-labelledby="settingsHeading" hidden>
+        <div class="view-heading">
+          <div>
+            <p class="eyebrow"><span>偏好设置</span><span class="eyebrow-separator"></span><span>本地留存</span></p>
+            <h1 id="settingsHeading">让规则，<span class="heading-emphasis"><span class="brush-text">按你的方式运转。</span></span></h1>
+          </div>
+          <div class="heading-aside">
+            <p class="heading-note">保存后立即生效</p>
+          </div>
+        </div>
+
+        <form class="settings-layout" id="settingsForm" novalidate>
+          <section class="settings-card">
+            <div class="settings-card-head">
+              <span class="settings-icon" aria-hidden="true">
+                <svg viewBox="0 0 22 22" fill="none"><rect x="3" y="4.5" width="16" height="14" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M7 2.5v4M15 2.5v4M3 9h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <h2>工作与日薪</h2>
+                <p>作为每个新工作日的默认配置</p>
+              </div>
+            </div>
+
+            <div class="settings-fields">
+              <div class="field-group">
+                <label class="field-label" for="defaultWageInput">默认每日基本工资</label>
+                <div class="money-field">
+                  <span class="money-prefix">¥</span>
+                  <input class="text-input money-input" id="defaultWageInput" type="number" inputmode="decimal" min="0.01" max="10000000" step="0.01" autocomplete="off" aria-describedby="defaultWageHint defaultWageError">
+                  <span class="money-suffix">元 / 天</span>
+                </div>
+                <p class="field-hint" id="defaultWageHint">用于每个新工作日，可随时修改</p>
+                <p class="field-error" id="defaultWageError" hidden></p>
+              </div>
+
+              <div class="field-group">
+                <div class="field-label-row">
+                  <span class="field-label">默认工作时间段</span>
+                  <span class="duration-chip" id="settingsDurationPreview">9 小时 00 分</span>
+                </div>
+                <div class="time-range">
+                  <label class="time-field">
+                    <span>开始</span>
+                    <input class="text-input" id="settingsStart" type="time" step="60" aria-label="默认工作开始时间">
+                  </label>
+                  <span class="time-arrow" aria-hidden="true">
+                    <svg viewBox="0 0 24 12" fill="none"><path d="M1 6h21m-5-5 5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </span>
+                  <label class="time-field">
+                    <span>结束</span>
+                    <input class="text-input" id="settingsEnd" type="time" step="60" aria-label="默认工作结束时间">
+                  </label>
+                </div>
+                <p class="field-hint">支持跨天，例如 22:00 至次日 06:00。今日已有计时时，只影响之后新的一天。</p>
+                <p class="field-error" id="settingsTimeError" hidden></p>
+
+                <div class="break-config">
+                  <div class="break-config-head">
+                    <label class="break-toggle">
+                      <input id="settingsBreakToggle" type="checkbox" role="switch" aria-label="默认扣除休息时间">
+                      <span class="break-checkbox" aria-hidden="true"></span>
+                      <span>扣除休息时间</span>
+                    </label>
+                    <span class="break-chip" id="settingsBreakChip">未扣除</span>
+                  </div>
+                  <div class="break-time-fields" id="settingsBreakFields" hidden>
+                    <label class="break-time-field">
+                      <span>休息开始</span>
+                      <input class="text-input" id="settingsBreakStart" type="time" step="60" aria-label="默认休息开始时间" aria-describedby="settingsBreakHint settingsBreakError">
+                    </label>
+                    <span class="break-dash" aria-hidden="true">—</span>
+                    <label class="break-time-field">
+                      <span>休息结束</span>
+                      <input class="text-input" id="settingsBreakEnd" type="time" step="60" aria-label="默认休息结束时间" aria-describedby="settingsBreakHint settingsBreakError">
+                    </label>
+                  </div>
+                  <p class="field-hint" id="settingsBreakHint">开启后，午休等不计薪时间会从标准工时中扣除。</p>
+                  <p class="field-error" id="settingsBreakError" hidden></p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-head">
+              <span class="settings-icon is-red" aria-hidden="true">
+                <svg viewBox="0 0 22 22" fill="none"><path d="M11 2.8v3.1M11 16.1v3.1M4.2 11H1.1M20.9 11h-3.1M5.8 5.8 3.6 3.6M18.4 18.4l-2.2-2.2M16.2 5.8l2.2-2.2M3.6 18.4l2.2-2.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="11" cy="11" r="4.4" stroke="currentColor" stroke-width="1.6"/></svg>
+              </span>
+              <div>
+                <h2>加班费标准</h2>
+                <p>统一作用于所有加班时段的计算</p>
+              </div>
+            </div>
+
+            <fieldset class="mode-fieldset">
+              <legend class="field-label">计算方式</legend>
+              <div class="mode-switch">
+                <label class="mode-option">
+                  <input type="radio" name="overtimeMode" id="modeMultiplier" value="multiplier">
+                  <span class="mode-option-inner">
+                    <strong>按倍率</strong>
+                    <small>标准时薪 × 倍率</small>
+                  </span>
+                </label>
+                <label class="mode-option">
+                  <input type="radio" name="overtimeMode" id="modeHourly" value="hourly">
+                  <span class="mode-option-inner">
+                    <strong>按固定时薪</strong>
+                    <small>直接填写加班时薪</small>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+
+            <div class="field-group" id="multiplierField">
+              <label class="field-label" for="multiplierInput">加班倍率</label>
+              <div class="unit-field">
+                <input class="text-input" id="multiplierInput" type="number" inputmode="decimal" min="0.1" max="10" step="0.01" autocomplete="off" aria-describedby="multiplierHint multiplierError">
+                <span class="unit-suffix">倍</span>
+              </div>
+              <p class="field-hint" id="multiplierHint">常见示例：工作日 1.5 倍，休息日 2 倍</p>
+              <p class="field-error" id="multiplierError" hidden></p>
+            </div>
+
+            <div class="field-group" id="hourlyField" hidden>
+              <label class="field-label" for="hourlyInput">固定加班时薪</label>
+              <div class="money-field">
+                <span class="money-prefix">¥</span>
+                <input class="text-input money-input" id="hourlyInput" type="number" inputmode="decimal" min="0.01" max="10000000" step="0.01" autocomplete="off" aria-describedby="hourlyHint hourlyError">
+                <span class="money-suffix">元 / 小时</span>
+              </div>
+              <p class="field-hint" id="hourlyHint">不随每日基本工资变化</p>
+              <p class="field-error" id="hourlyError" hidden></p>
+            </div>
+
+            <div class="rate-preview" id="ratePreview">
+              <span class="rate-preview-label">按当前默认配置估算</span>
+              <div class="rate-preview-grid">
+                <div><span>标准时薪</span><strong id="previewStandardHourly">—</strong></div>
+                <div><span>加班时薪</span><strong id="previewOtHourly">—</strong></div>
+                <div><span>加班秒薪</span><strong id="previewOtSecond">—</strong></div>
+              </div>
+            </div>
+          </section>
+
+          <div class="settings-savebar">
+            <div class="savebar-status">
+              <span class="savebar-dot" id="settingsDirtyDot"></span>
+              <span id="settingsStatus">设置已保存</span>
+            </div>
+            <div class="savebar-actions">
+              <button class="button button-quiet" id="resetSettingsBtn" type="button">恢复默认</button>
+              <button class="button button-primary" id="saveSettingsBtn" type="submit">
+                <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="m3.7 9.2 3.2 3.2 7.4-7.4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                保存设置
+              </button>
+            </div>
+          </div>
+
+          <section class="danger-card">
+            <div class="danger-copy">
+              <span class="danger-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 6.5v4.2M10 14.1v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M8.5 2.9 1.9 14.2A1.8 1.8 0 0 0 3.5 17h13a1.8 1.8 0 0 0 1.6-2.8L11.5 2.9a1.7 1.7 0 0 0-3 0Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+              </span>
+              <div>
+                <h2>本地数据</h2>
+                <p>当前浏览器共保存 <strong id="localRecordCount">0</strong> 条日工资记录。清空后设置、今日进度与历史记录都会删除。</p>
+              </div>
+            </div>
+            <button class="button button-danger" id="clearDataBtn" type="button">清空本地数据</button>
+          </section>
+        </form>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-brand"><span class="footer-mark">秒</span><span>秒薪 · 一寸光阴一寸金</span></div>
+      <p>本机优先保存；开启共享后仅同步端到端加密的密文到 KVdb。</p>
+    </footer>
+  </div>
+
+  <div class="toast-region" id="toastRegion" role="status" aria-live="polite" aria-atomic="false"></div>
+
+  <dialog class="cloud-dialog" id="cloudDialog" aria-labelledby="cloudTitle">
+    <div class="cloud-panel">
+      <header class="cloud-head">
+        <span class="cloud-seal" aria-hidden="true">云</span>
+        <div class="cloud-head-copy">
+          <p class="panel-eyebrow">共享工资簿</p>
+          <h2 id="cloudTitle">多人同步</h2>
+        </div>
+        <button class="cloud-close" id="cloudClose" type="button" aria-label="关闭共享设置">×</button>
+      </header>
+
+      <p class="cloud-intro" id="cloudIntro">创建一个加密共享空间，把邀请链接和口令分别告诉同事或家人；每个人用自己的称呼记录工资。</p>
+
+      <div class="cloud-tabs" id="cloudTabs" role="tablist" aria-label="共享空间操作">
+        <button class="cloud-tab is-active" type="button" role="tab" data-cloud-tab="create" aria-selected="true">创建空间</button>
+        <button class="cloud-tab" type="button" role="tab" data-cloud-tab="join" aria-selected="false">加入空间</button>
+      </div>
+
+      <div class="cloud-pane" id="cloudCreatePane" role="tabpanel" data-cloud-pane="create">
+        <form class="cloud-form" id="cloudCreateForm" novalidate>
+          <div class="field-group">
+            <label class="field-label" for="cloudEmail">邮箱</label>
+            <input class="text-input cloud-text" id="cloudEmail" type="email" autocomplete="email" spellcheck="false" placeholder="用于在 KVdb 创建空间">
+            <p class="field-hint">KVdb 会用该邮箱创建共享空间并发送确认邮件，空间数据本身仍是端到端加密的。</p>
+          </div>
+          <div class="cloud-form-grid">
+            <div class="field-group">
+              <label class="field-label" for="cloudCreatePass">设置空间口令</label>
+              <input class="text-input cloud-text" id="cloudCreatePass" type="password" autocomplete="new-password" placeholder="至少 8 个字符">
+            </div>
+            <div class="field-group">
+              <label class="field-label" for="cloudCreateConfirm">再次输入口令</label>
+              <input class="text-input cloud-text" id="cloudCreateConfirm" type="password" autocomplete="new-password" placeholder="确认口令">
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="cloudCreateName">我的称呼</label>
+            <input class="text-input cloud-text" id="cloudCreateName" type="text" maxlength="16" autocomplete="nickname" placeholder="例如：阿明">
+            <p class="field-hint">同一空间按称呼区分成员；本机现有工资记录会归入该称呼。</p>
+          </div>
+          <p class="field-error cloud-form-error" id="cloudCreateError" role="alert" hidden></p>
+          <button class="button button-primary button-full" id="cloudCreateBtn" type="submit">
+            <span>创建并进入</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="cloud-pane" id="cloudJoinPane" role="tabpanel" data-cloud-pane="join" hidden>
+        <form class="cloud-form" id="cloudJoinForm" novalidate>
+          <div class="field-group">
+            <label class="field-label" for="cloudSpaceInput">邀请链接 / 空间 ID</label>
+            <input class="text-input cloud-text" id="cloudSpaceInput" type="text" autocomplete="off" spellcheck="false" placeholder="粘贴邀请链接，或填写空间 ID">
+            <p class="field-hint">打开邀请链接时会自动填入空间 ID。</p>
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="cloudJoinPass">空间口令</label>
+            <input class="text-input cloud-text" id="cloudJoinPass" type="password" autocomplete="current-password" placeholder="输入共享口令">
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="cloudJoinName">我的称呼</label>
+            <input class="text-input cloud-text" id="cloudJoinName" type="text" maxlength="16" autocomplete="nickname" placeholder="与之前一致即可继续自己的工资簿">
+            <p class="field-hint">称呼相同会进入同一成员账簿；新称呼会创建一个新成员。同一空间内的成员可以查看彼此的工资记录。</p>
+          </div>
+          <p class="field-error cloud-form-error" id="cloudJoinError" role="alert" hidden></p>
+          <button class="button button-primary button-full" id="cloudJoinBtn" type="submit">
+            <span>解锁并加入</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="cloud-pane" id="cloudConnectedPane" role="tabpanel" hidden>
+        <div class="cloud-account-card">
+          <div>
+            <span>当前成员</span>
+            <strong id="cloudMemberText">--</strong>
+          </div>
+          <div>
+            <span>共享空间</span>
+            <strong id="cloudSpaceText">--</strong>
+          </div>
+        </div>
+        <div class="cloud-member-row">
+          <span>空间成员</span>
+          <div class="cloud-member-list" id="cloudMembersText">--</div>
+        </div>
+        <div class="cloud-status-row">
+          <span class="cloud-live-dot" aria-hidden="true"></span>
+          <span id="cloudSyncText">已同步</span>
+          <time id="cloudLastSync">--</time>
+        </div>
+        <div class="cloud-actions">
+          <button class="button button-primary" id="cloudSyncNowBtn" type="button">立即同步</button>
+          <button class="button button-quiet" id="cloudCopyLinkBtn" type="button">复制邀请链接</button>
+          <button class="button button-quiet cloud-danger" id="cloudDisconnectBtn" type="button">退出空间</button>
+        </div>
+        <p class="cloud-note">邀请链接只包含空间 ID；空间口令请通过其他方式单独告知。退出空间不会删除云端记录，本机数据会保留。</p>
+      </div>
+
+      <footer class="cloud-foot">
+        <span>端到端加密 · 口令只在本机用于加解密</span>
+        <span id="cloudMemberCountLabel">GitHub Pages 共享版</span>
+      </footer>
+    </div>
+  </dialog>
+
+  <dialog class="confirm-dialog" id="confirmDialog" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+    <div class="dialog-body">
+      <span class="dialog-icon" id="dialogIcon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 7.5v5.3M12 16.5v.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9.2" stroke="currentColor" stroke-width="1.7"/></svg>
+      </span>
+      <h2 id="confirmTitle">确认操作</h2>
+      <p id="confirmMessage"></p>
+      <div class="dialog-actions">
+        <button class="button button-quiet" id="confirmCancel" type="button">取消</button>
+        <button class="button button-danger" id="confirmAccept" type="button">确认</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="js/wage.js" defer></script>
+  <script src="js/storage.js" defer></script>
+  <script src="js/cloud.js" defer></script>
+  <script src="js/app.js" defer></script>
+</body>
+</html>
