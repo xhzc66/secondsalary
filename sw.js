@@ -2,7 +2,7 @@
  * 缓存应用外壳，让主屏幕 App 在弱网/离线时也能打开。
  * 云端 KVdb、在线 AI 等跨域请求不做缓存。
  */
-const CACHE_NAME = "secondsalary-pwa-v1";
+const CACHE_NAME = "secondsalary-pwa-v2";
 const CACHE_PREFIX = "secondsalary-pwa-";
 const APP_SHELL = [
   "./",

@@ -563,6 +563,8 @@ dialog::backdrop { background: rgba(2,3,4,.72); backdrop-filter: blur(9px); }
 .cloud-form { display: flex; flex-direction: column; gap: 12px; }
 .cloud-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .cloud-text { height: 40px; font-size: 11px; }
+.cloud-verify-hint a { color: var(--gold); text-decoration: underline; text-underline-offset: 2px; }
+.cloud-verify-hint a:hover { color: var(--gold-2); }
 .cloud-form-error { padding: 8px 10px; border: 1px solid rgba(239,124,114,.22); border-radius: 7px; background: var(--red-dim); }
 .cloud-account-card { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .cloud-account-card > div { display: flex; flex-direction: column; gap: 3px; padding: 11px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.022); }

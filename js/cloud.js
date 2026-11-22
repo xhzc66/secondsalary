@@ -360,7 +360,16 @@
         }
       );
       if (!response.ok) {
-        throw new CloudError("保存到共享空间失败（" + response.status + "）", "kvdb_write_failed", { status: response.status });
+        const detail = (await response.text()).trim();
+        if (response.status === 403 && /email address not verified/i.test(detail)) {
+          throw new CloudError(
+            "KVdb 要求先验证邮箱。请打开 https://kvdb.io/login 验证该邮箱，然后回到这里重新创建空间。",
+            "email_not_verified",
+            { status: response.status }
+          );
+        }
+        const suffix = detail ? "：" + detail.slice(0, 180) : "";
+        throw new CloudError("保存到共享空间失败（" + response.status + "）" + suffix, "kvdb_write_failed", { status: response.status });
       }
     } catch (error) {
       if (error instanceof CloudError) throw error;
