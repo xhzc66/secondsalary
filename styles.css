@@ -190,6 +190,7 @@ input[type="date"].text-input, input[type="time"].text-input, input[type="month"
 .today-grid { display: grid; grid-template-columns: minmax(0,1.48fr) minmax(330px,.82fr); gap: 18px; align-items: stretch; }
 .pay-hero { position: relative; overflow: hidden; min-height: 610px; padding: 25px 27px 23px; background: radial-gradient(620px 380px at 82% 12%,rgba(232,178,94,.14),transparent 68%), radial-gradient(480px 340px at 8% 92%,rgba(116,147,205,.09),transparent 66%), linear-gradient(155deg,#1a1b1e 0%,#101113 55%,#0b0c0d 100%); }
 .hero-car-glow { position: absolute; inset: 0; background: url("assets/su7.jpg") center 57% / cover no-repeat; opacity: .075; filter: grayscale(1) contrast(1.15); mix-blend-mode: screen; mask-image: linear-gradient(to bottom,transparent 0%,#000 30%,#000 66%,transparent 92%); pointer-events: none; }
+.pay-hero::after { content: "SU7"; position: absolute; right: 22px; bottom: 10px; color: rgba(255,255,255,.028); font-size: clamp(100px,13vw,178px); font-weight: 700; letter-spacing: -.09em; line-height: .78; pointer-events: none; }
 .hero-topline { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.035); color: var(--muted); font-size: 10px; font-weight: 550; letter-spacing: .04em; }
 .status-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
