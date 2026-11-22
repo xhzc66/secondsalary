@@ -6,8 +6,9 @@
   "use strict";
 
   const STORAGE_KEY = "secondsalary.state.v1";
-  const STATE_VERSION = 3;
+  const STATE_VERSION = 4;
   const TOMBSTONE_RETENTION_DAYS = 400;
+  const MAX_LEDGER_ENTRIES = 5000;
 
   const DEFAULT_SETTINGS = Object.freeze({
     defaultDailyWageCents: 30000,
@@ -89,6 +90,114 @@
     return result;
   }
 
+  function defaultWishlist() {
+    return {
+      targetCents: 23590000,
+      initialSavedCents: 0,
+      title: "小米 SU7",
+      subtitle: "雅灰 · 20英寸梅花轮毂 · 砂陶米",
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  function normalizeWishlist(raw) {
+    const fallback = defaultWishlist();
+    if (!raw || typeof raw !== "object") return fallback;
+    const target = Number(raw.targetCents);
+    const initial = Number(raw.initialSavedCents);
+    return {
+      targetCents: Number.isInteger(target) && target > 0 && target <= 100000000000
+        ? target
+        : fallback.targetCents,
+      initialSavedCents: Number.isInteger(initial) && initial >= 0 && initial <= 100000000000
+        ? initial
+        : 0,
+      title: typeof raw.title === "string" && raw.title.trim()
+        ? raw.title.trim().slice(0, 30)
+        : fallback.title,
+      subtitle: typeof raw.subtitle === "string" && raw.subtitle.trim()
+        ? raw.subtitle.trim().slice(0, 60)
+        : fallback.subtitle,
+      updatedAt: Number.isFinite(Date.parse(raw.updatedAt))
+        ? new Date(raw.updatedAt).toISOString()
+        : fallback.updatedAt
+    };
+  }
+
+  function normalizeLedgerEntry(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim().slice(0, 60) : "";
+    if (!id) return null;
+    if (!global.WageCore.parseDateKey(raw.date)) return null;
+    const type = raw.type === "income" ? "income" : raw.type === "expense" ? "expense" : "";
+    if (!type) return null;
+    const amount = Number(raw.amountCents);
+    if (!Number.isInteger(amount) || amount <= 0 || amount > 100000000000) return null;
+    const category = typeof raw.category === "string" && raw.category.trim()
+      ? raw.category.trim().slice(0, 20)
+      : (type === "income" ? "其他收入" : "其他支出");
+    const createdAt = Number.isFinite(Date.parse(raw.createdAt))
+      ? new Date(raw.createdAt).toISOString()
+      : new Date().toISOString();
+    return {
+      id: id,
+      date: raw.date,
+      type: type,
+      category: category,
+      amountCents: amount,
+      note: typeof raw.note === "string" ? raw.note.trim().slice(0, 120) : "",
+      deleted: Boolean(raw.deleted),
+      createdAt: createdAt,
+      updatedAt: Number.isFinite(Date.parse(raw.updatedAt))
+        ? new Date(raw.updatedAt).toISOString()
+        : createdAt
+    };
+  }
+
+  function normalizeLedger(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    const result = {};
+    Object.keys(raw).slice(0, MAX_LEDGER_ENTRIES).forEach(function (key) {
+      const entry = normalizeLedgerEntry(raw[key]);
+      if (entry) result[entry.id] = entry;
+    });
+    return result;
+  }
+
+  function normalizeRestDays(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    const result = {};
+    Object.keys(raw).forEach(function (key) {
+      if (global.WageCore.parseDateKey(key) && raw[key]) result[key] = true;
+    });
+    return result;
+  }
+
+  function normalizeRestDayUpdated(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    const result = {};
+    Object.keys(raw).forEach(function (key) {
+      if (!global.WageCore.parseDateKey(key)) return;
+      const stamp = Date.parse(raw[key]);
+      if (!Number.isFinite(stamp)) return;
+      result[key] = new Date(stamp).toISOString();
+    });
+    return result;
+  }
+
+  function normalizePauseIntervals(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.slice(-60).map(function (item) {
+      const start = Date.parse(item && item.start);
+      if (!Number.isFinite(start)) return null;
+      const end = item && item.end ? Date.parse(item.end) : null;
+      return {
+        start: new Date(start).toISOString(),
+        end: Number.isFinite(end) && end >= start ? new Date(end).toISOString() : null
+      };
+    }).filter(Boolean);
+  }
+
   function createSession(dateKey, settings) {
     const source = settings || DEFAULT_SETTINGS;
     return {
@@ -100,6 +209,7 @@
       breakStart: source.breakStart,
       breakEnd: source.breakEnd,
       overtimeEnabled: false,
+      pauseIntervals: [],
       accumulatedMs: 0,
       wasRunning: false,
       createdAt: new Date().toISOString(),
@@ -147,6 +257,7 @@
     }
 
     result.overtimeEnabled = Boolean(raw.overtimeEnabled);
+    result.pauseIntervals = normalizePauseIntervals(raw.pauseIntervals);
 
     const accumulatedMs = Number(raw.accumulatedMs);
     if (Number.isFinite(accumulatedMs) && accumulatedMs >= 0) {
@@ -218,6 +329,7 @@
       breakEnabled: config.breakEnabled,
       breakStart: config.breakStart,
       breakEnd: config.breakEnd,
+      pauseIntervals: normalizePauseIntervals(raw.pauseIntervals),
       standardSeconds: pay.totalSeconds,
       spanSeconds: pay.spanSeconds,
       breakSeconds: pay.breakSeconds,
@@ -268,7 +380,11 @@
       settingsUpdatedAt: now,
       today: createSession(global.WageCore.todayKey(), settings),
       records: {},
-      deletedRecords: {}
+      deletedRecords: {},
+      restDays: {},
+      restDayUpdated: {},
+      wishlist: defaultWishlist(),
+      ledger: {}
     };
   }
 
@@ -287,7 +403,11 @@
       settingsUpdatedAt: settingsUpdatedAt,
       today: normalizeSession(raw.today, settings),
       records: normalizeRecords(raw.records),
-      deletedRecords: normalizeDeletedRecords(raw.deletedRecords)
+      deletedRecords: normalizeDeletedRecords(raw.deletedRecords),
+      restDays: normalizeRestDays(raw.restDays),
+      restDayUpdated: normalizeRestDayUpdated(raw.restDayUpdated),
+      wishlist: normalizeWishlist(raw.wishlist),
+      ledger: normalizeLedger(raw.ledger)
     };
     return state;
   }
@@ -330,7 +450,11 @@
       settingsUpdatedAt: state.settingsUpdatedAt,
       today: state.today,
       records: state.records,
-      deletedRecords: state.deletedRecords || {}
+      deletedRecords: state.deletedRecords || {},
+      restDays: state.restDays || {},
+      restDayUpdated: state.restDayUpdated || {},
+      wishlist: state.wishlist || defaultWishlist(),
+      ledger: state.ledger || {}
     };
 
     try {
@@ -365,6 +489,13 @@
     normalizeRecord: normalizeRecord,
     normalizeRecords: normalizeRecords,
     normalizeDeletedRecords: normalizeDeletedRecords,
+    defaultWishlist: defaultWishlist,
+    normalizeWishlist: normalizeWishlist,
+    normalizeLedgerEntry: normalizeLedgerEntry,
+    normalizeLedger: normalizeLedger,
+    normalizeRestDays: normalizeRestDays,
+    normalizeRestDayUpdated: normalizeRestDayUpdated,
+    normalizePauseIntervals: normalizePauseIntervals,
     defaultState: defaultState,
     normalizeState: normalizeState,
     load: load,

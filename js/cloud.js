@@ -461,6 +461,51 @@
     };
   }
 
+  function mergeRestDays(localRestDays, localUpdated, remoteRestDays, remoteUpdated) {
+    const days = Object.assign({}, remoteRestDays || {}, localRestDays || {});
+    const updated = {};
+    const localMap = localUpdated || {};
+    const remoteMap = remoteUpdated || {};
+    const dates = new Set(Object.keys(localMap).concat(Object.keys(remoteMap)));
+    dates.forEach(function (date) {
+      const localStamp = parseStamp(localMap[date]);
+      const remoteStamp = parseStamp(remoteMap[date]);
+      const winner = Math.max(localStamp, remoteStamp);
+      if (winner > 0) updated[date] = new Date(winner).toISOString();
+      if (localStamp || remoteStamp) {
+        const localWins = localStamp >= remoteStamp;
+        const value = localWins ? Boolean(localRestDays && localRestDays[date]) : Boolean(remoteRestDays && remoteRestDays[date]);
+        if (value) days[date] = true;
+        else delete days[date];
+      }
+    });
+    return { restDays: Store.normalizeRestDays(days), restDayUpdated: Store.normalizeRestDayUpdated(updated) };
+  }
+
+  function mergeWishlist(localWishlist, remoteWishlist, preferLocal) {
+    if (!remoteWishlist) return Store.normalizeWishlist(localWishlist);
+    if (!localWishlist) return Store.normalizeWishlist(remoteWishlist);
+    if (!preferLocal) return Store.normalizeWishlist(remoteWishlist);
+    return parseStamp(localWishlist.updatedAt) > parseStamp(remoteWishlist.updatedAt)
+      ? Store.normalizeWishlist(localWishlist)
+      : Store.normalizeWishlist(remoteWishlist);
+  }
+
+  function mergeLedger(localLedger, remoteLedger) {
+    const result = {};
+    const local = Store.normalizeLedger(localLedger);
+    const remote = Store.normalizeLedger(remoteLedger);
+    Object.keys(remote).forEach(function (id) { result[id] = remote[id]; });
+    Object.keys(local).forEach(function (id) {
+      const localEntry = local[id];
+      const remoteEntry = result[id];
+      if (!remoteEntry || parseStamp(localEntry.updatedAt) >= parseStamp(remoteEntry.updatedAt)) {
+        result[id] = localEntry;
+      }
+    });
+    return Store.normalizeLedger(result);
+  }
+
   function mergeMember(existing, snapshot, options) {
     const opts = options || {};
     const name = existing ? existing.name : normalizeMemberName(snapshot.memberName);
@@ -494,6 +539,19 @@
       existing ? existing.deletedRecords : {}
     );
 
+    const restData = mergeRestDays(
+      snapshot.restDays,
+      snapshot.restDayUpdated,
+      existing ? existing.restDays : {},
+      existing ? existing.restDayUpdated : {}
+    );
+    const wishlist = mergeWishlist(
+      snapshot.wishlist,
+      existing ? existing.wishlist : null,
+      !existing || Boolean(opts.mergeSettings)
+    );
+    const ledger = mergeLedger(snapshot.ledger, existing ? existing.ledger : {});
+
     return {
       id: key,
       name: existing ? existing.name : name,
@@ -501,6 +559,10 @@
       settingsUpdatedAt: settingsUpdatedAt,
       records: recordData.records,
       deletedRecords: recordData.deletedRecords,
+      restDays: restData.restDays,
+      restDayUpdated: restData.restDayUpdated,
+      wishlist: wishlist,
+      ledger: ledger,
       createdAt: existing ? existing.createdAt : nowIso(),
       updatedAt: existing ? existing.updatedAt : nowIso()
     };
@@ -513,13 +575,21 @@
       settings: left.settings,
       settingsUpdatedAt: left.settingsUpdatedAt,
       records: left.records,
-      deletedRecords: left.deletedRecords
+      deletedRecords: left.deletedRecords,
+      restDays: left.restDays,
+      restDayUpdated: left.restDayUpdated,
+      wishlist: left.wishlist,
+      ledger: left.ledger
     }) === JSON.stringify({
       name: right.name,
       settings: right.settings,
       settingsUpdatedAt: right.settingsUpdatedAt,
       records: right.records,
-      deletedRecords: right.deletedRecords
+      deletedRecords: right.deletedRecords,
+      restDays: right.restDays,
+      restDayUpdated: right.restDayUpdated,
+      wishlist: right.wishlist,
+      ledger: right.ledger
     });
   }
 
@@ -541,6 +611,10 @@
       settingsUpdatedAt: settingsUpdatedAt,
       records: Store.normalizeRecords(raw.records),
       deletedRecords: Store.normalizeDeletedRecords(raw.deletedRecords),
+      restDays: Store.normalizeRestDays(raw.restDays),
+      restDayUpdated: Store.normalizeRestDayUpdated(raw.restDayUpdated),
+      wishlist: Store.normalizeWishlist(raw.wishlist),
+      ledger: Store.normalizeLedger(raw.ledger),
       createdAt: parseStamp(raw.createdAt) > 0 ? new Date(raw.createdAt).toISOString() : nowIso(),
       updatedAt: parseStamp(raw.updatedAt) > 0 ? new Date(raw.updatedAt).toISOString() : nowIso()
     };
@@ -565,6 +639,10 @@
           settingsUpdatedAt: newer.settingsUpdatedAt,
           records: mergeRecordSets(older.records, older.deletedRecords, newer.records, newer.deletedRecords).records,
           deletedRecords: mergeRecordSets(older.records, older.deletedRecords, newer.records, newer.deletedRecords).deletedRecords,
+          restDays: mergeRestDays(newer.restDays, newer.restDayUpdated, older.restDays, older.restDayUpdated).restDays,
+          restDayUpdated: mergeRestDays(newer.restDays, newer.restDayUpdated, older.restDays, older.restDayUpdated).restDayUpdated,
+          wishlist: mergeWishlist(newer.wishlist, older.wishlist, true),
+          ledger: mergeLedger(newer.ledger, older.ledger),
           createdAt: older.createdAt,
           updatedAt: newer.updatedAt
         };
@@ -591,6 +669,10 @@
         : nowIso(),
       records: Store.normalizeRecords(snapshot.records),
       deletedRecords: Store.normalizeDeletedRecords(snapshot.deletedRecords),
+      restDays: Store.normalizeRestDays(snapshot.restDays),
+      restDayUpdated: Store.normalizeRestDayUpdated(snapshot.restDayUpdated),
+      wishlist: Store.normalizeWishlist(snapshot.wishlist),
+      ledger: Store.normalizeLedger(snapshot.ledger),
       createdAt: nowIso(),
       updatedAt: nowIso()
     };
@@ -616,7 +698,11 @@
         ? new Date(source.settingsUpdatedAt).toISOString()
         : nowIso(),
       records: Store.normalizeRecords(source.records),
-      deletedRecords: Store.normalizeDeletedRecords(source.deletedRecords)
+      deletedRecords: Store.normalizeDeletedRecords(source.deletedRecords),
+      restDays: Store.normalizeRestDays(source.restDays),
+      restDayUpdated: Store.normalizeRestDayUpdated(source.restDayUpdated),
+      wishlist: Store.normalizeWishlist(source.wishlist),
+      ledger: Store.normalizeLedger(source.ledger)
     };
   }
 

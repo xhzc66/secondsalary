@@ -16,6 +16,7 @@
     runStartedAt: 0,
     lastPersistAt: 0,
     lastSecond: -1,
+    lastPhase: "",
     lastCents: null,
     amountAnimationTimer: 0,
     persistFailures: 0,
@@ -35,7 +36,10 @@
     cloudStatus: null,
     localStorageError: false,
     pendingCloudSpace: "",
-    cloudAutoConnectTried: false
+    cloudAutoConnectTried: false,
+    ledgerType: "expense",
+    aiAdvice: "",
+    aiAdviceLoading: false
   };
 
   let state = null;
@@ -56,7 +60,7 @@
     fillSettingsForm(state.settings);
     renderAll();
     activateView(readInitialView(), { updateHash: false, focus: false, scroll: false });
-
+    ensureCurrentWorkday();
     updateClock();
     window.setInterval(tick, 250);
 
@@ -80,10 +84,11 @@
       "statusPill", "statusText", "heroDate", "liveAmount", "amountNote", "notePulse", "amountNoteText",
       "standardPay", "standardMeta", "overtimePay", "overtimeMeta", "workedTime", "workedMeta",
       "perSecondRate", "perSecondMeta", "progressLabel", "progressPercent", "progressTrack", "progressFill",
-      "progressFootLeft", "progressFootRight", "startBtn", "startBtnText", "pauseBtn", "resetBtn",
+      "progressFootLeft", "progressFootRight", "startBtn", "startBtnText", "resetBtn",
       "dailyWageInput", "wageError", "workStartInput", "workEndInput", "standardDuration", "timeError",
       "breakToggle", "breakFields", "breakStartInput", "breakEndInput", "breakOffLabel", "breakHint", "breakError",
       "crossDayBadge", "dayMemberBadge", "overtimeToggle", "overtimeRuleText", "overtimeRuleDetail", "settingsLink",
+      "restTomorrowToggle", "restTomorrowHint",
       "dayBasePotential", "dayOtPotential", "dayPotential",
       "jumpOverviewBtn", "monthPicker", "prevMonthBtn", "nextMonthBtn", "currentMonthBtn", "recordCount",
       "exportCsvBtn", "summaryTotal", "summaryTotalSub", "summaryBase", "summaryBaseSub", "summaryOt",
@@ -104,74 +109,63 @@
       "cloudJoinName", "cloudJoinError", "cloudJoinBtn", "cloudMemberText", "cloudSpaceText",
       "cloudMembersText", "cloudSyncText", "cloudLastSync", "cloudSyncNowBtn", "cloudCopyLinkBtn",
       "cloudDisconnectBtn", "cloudMemberCountLabel",
-      "confirmDialog", "dialogIcon", "confirmTitle", "confirmMessage", "confirmCancel", "confirmAccept", "toastRegion"
+      "confirmDialog", "dialogIcon", "confirmTitle", "confirmMessage", "confirmCancel", "confirmAccept", "toastRegion",
+      "goalStrip", "goalStripTitle", "goalStripHeadline", "goalStripGap", "goalStripSaved", "goalStripTarget", "goalStripPercent", "goalStripFill", "goalJumpBtn",
+      "wishlistTitle", "wishlistSubtitle", "wishlistHeroTarget", "wishlistHeroSaved", "wishlistSaved",
+      "wishlistGap", "wishlistGapSub", "wishlistProgress", "wishlistProgressFill", "wishlistProgressSub",
+      "wishlistEta", "wishlistEtaSub", "ledgerForm", "ledgerDate", "ledgerTypeExpense", "ledgerTypeIncome",
+      "ledgerCategory", "ledgerAmount", "ledgerNote", "ledgerError", "ledgerSubmitBtn",
+      "ledgerMonthExpense", "ledgerMonthIncome", "ledgerMonthNet", "ledgerCount", "ledgerList", "ledgerEmpty",
+      "aiInsights", "aiStatus", "aiRefreshBtn", "aiDeepBtn", "wishlistConfigForm", "wishlistTargetInput",
+      "wishlistInitialInput", "wishlistConfigError", "wishlistConfigStatus", "wishlistSaveBtn"
     ].forEach(function (id) { dom[id] = $(id); });
   }
 
   function restoreSession(loaded) {
-    runtime.baseMs = Math.max(0, Number(session.accumulatedMs) || 0);
-    session.accumulatedMs = runtime.baseMs;
     runtime.running = false;
     runtime.runStartedAt = 0;
-
-    const wasRunning = Boolean(session.wasRunning);
+    runtime.baseMs = 0;
+    runtime.lastSecond = -1;
+    runtime.lastPhase = "";
+    session.accumulatedMs = 0;
     session.wasRunning = false;
-
-    let rolled = false;
-    let hadProgress = false;
-    const today = W.todayKey();
-
-    if (session.date !== today) {
-      hadProgress = runtime.baseMs >= 1000;
-      if (hadProgress && !state.records[session.date]) {
-        const oldRecord = buildRecordFor(session, runtime.baseMs);
-        if (oldRecord) state.records[oldRecord.date] = oldRecord;
-      }
-      state.today = Store.createSession(today, state.settings);
-      session = state.today;
-      runtime.baseMs = 0;
-      runtime.lastSecond = -1;
-      rolled = true;
-    }
 
     if (loaded.storageError) {
       setStorageUnavailable();
     }
 
     persistState({ updateRecord: false, silent: true });
-
-    if (wasRunning) {
-      ui.initialToasts.push({
-        message: "已恢复上次计时进度，并自动暂停；点击「继续计薪」即可接着累计。",
-        type: "warning"
-      });
-    }
-    if (rolled && hadProgress) {
-      ui.initialToasts.push({
-        message: "检测到新的一天，今日计时已重新开始，昨天的记录已保留。",
-        type: "info"
-      });
-    }
   }
 
   function readInitialView() {
     const hash = String(window.location.hash || "").replace("#", "");
-    if (hash === "today" || hash === "overview" || hash === "settings") return hash;
+    if (hash === "today" || hash === "overview" || hash === "wishlist" || hash === "settings") return hash;
     return "today";
   }
 
   /* =======================================================
    * Time & persistence
    * ======================================================= */
-  function activeMilliseconds() {
-    if (runtime.running) {
-      return runtime.baseMs + Math.max(0, performance.now() - runtime.runStartedAt);
-    }
-    return runtime.baseMs;
+  function offsetDateKey(dateKey, days) {
+    const parsed = W.parseDateKey(dateKey);
+    if (!parsed) return dateKey;
+    const date = new Date(parsed.year, parsed.month - 1, parsed.day + days, 12, 0, 0, 0);
+    return W.localDateKey(date);
   }
 
-  function activeSeconds() {
-    return Math.floor(activeMilliseconds() / 1000);
+  function settingsConfig() {
+    return {
+      dailyWageCents: state.settings.defaultDailyWageCents,
+      workStart: state.settings.workStart,
+      workEnd: state.settings.workEnd,
+      breakEnabled: state.settings.breakEnabled,
+      breakStart: state.settings.breakStart,
+      breakEnd: state.settings.breakEnd,
+      overtimeEnabled: false,
+      overtimeMode: state.settings.overtimeMode,
+      overtimeMultiplierBps: state.settings.overtimeMultiplierBps,
+      overtimeHourlyCents: state.settings.overtimeHourlyCents
+    };
   }
 
   function dayConfig(source) {
@@ -190,15 +184,82 @@
     };
   }
 
-  function currentPay() {
-    return W.calcPay(dayConfig(), activeSeconds());
+  function shiftWindowFor(dateKey, config) {
+    const info = W.scheduleInfo(config.workStart, config.workEnd, {
+      enabled: Boolean(config.breakEnabled),
+      start: config.breakStart,
+      end: config.breakEnd
+    });
+    if (!info.ok) return null;
+    const start = W.dateTimeMs(dateKey, config.workStart);
+    if (start === null) return null;
+    return {
+      start: start,
+      end: start + (info.endAbsoluteMinutes - info.startMinutes) * 60000,
+      info: info
+    };
   }
 
-  function buildRecordFor(targetSession, totalMs) {
-    const workedSeconds = Math.floor(Math.max(0, Number(totalMs) || 0) / 1000);
-    if (workedSeconds <= 0) return null;
+  function restAutoResult(dateKey, config) {
+    const window = shiftWindowFor(dateKey, config);
+    return {
+      dateKey: dateKey,
+      phase: "rest",
+      isPaused: false,
+      shiftStartMs: window ? window.start : null,
+      shiftEndMs: window ? window.end : null,
+      breakStartMs: null,
+      breakEndMs: null,
+      standardSeconds: 0,
+      overtimeSeconds: 0,
+      totalSeconds: 0,
+      standardTotalSeconds: window ? window.info.seconds : 0,
+      standardMs: 0,
+      overtimeMs: 0,
+      capReached: false
+    };
+  }
+
+  function autoForSession(targetSession, atMs) {
+    if (!targetSession) return null;
     const config = dayConfig(targetSession);
-    const pay = W.calcPay(config, workedSeconds);
+    if (state.restDays && state.restDays[targetSession.date]) {
+      return restAutoResult(targetSession.date, config);
+    }
+    return W.autoWork(config, targetSession.date, atMs || Date.now(), targetSession.pauseIntervals || []);
+  }
+
+  function currentAuto(atMs) {
+    return autoForSession(session, atMs || Date.now());
+  }
+
+  function activeSeconds() {
+    const auto = currentAuto();
+    return auto ? auto.totalSeconds : 0;
+  }
+
+  function activeMilliseconds() {
+    return activeSeconds() * 1000;
+  }
+
+  function currentPay() {
+    const auto = currentAuto();
+    if (!auto || auto.phase === "rest") {
+      const pay = W.calcPay(dayConfig(), 0);
+      if (pay && auto) pay.auto = auto;
+      return pay;
+    }
+    const pay = W.calcPay(dayConfig(), auto.totalSeconds);
+    if (pay) pay.auto = auto;
+    return pay;
+  }
+
+  function buildRecordFor(targetSession, atMs) {
+    if (!targetSession) return null;
+    const auto = autoForSession(targetSession, atMs || Date.now());
+    if (!auto || auto.phase === "rest" || auto.totalSeconds <= 0) return null;
+    const config = dayConfig(targetSession);
+    const pay = W.calcPay(config, auto.totalSeconds);
     if (!pay) return null;
     return {
       date: targetSession.date,
@@ -208,6 +269,7 @@
       breakEnabled: targetSession.breakEnabled,
       breakStart: targetSession.breakStart,
       breakEnd: targetSession.breakEnd,
+      pauseIntervals: targetSession.pauseIntervals || [],
       standardSeconds: pay.totalSeconds,
       spanSeconds: pay.spanSeconds,
       breakSeconds: pay.breakSeconds,
@@ -227,15 +289,16 @@
 
   function persistState(options) {
     const opts = options || {};
-    const totalMs = activeMilliseconds();
-    session.accumulatedMs = Math.max(0, Math.floor(totalMs));
-    session.wasRunning = runtime.running;
+    const now = Date.now();
+    const auto = currentAuto(now);
+    session.accumulatedMs = auto ? auto.totalSeconds * 1000 : 0;
+    session.wasRunning = false;
     session.updatedAt = new Date().toISOString();
 
     if (!state.deletedRecords) state.deletedRecords = {};
 
     if (opts.updateRecord !== false) {
-      const record = buildRecordFor(session, totalMs);
+      const record = buildRecordFor(session, now);
       if (record) {
         state.records[session.date] = record;
         delete state.deletedRecords[session.date];
@@ -247,7 +310,11 @@
       settingsUpdatedAt: state.settingsUpdatedAt,
       today: session,
       records: state.records,
-      deletedRecords: state.deletedRecords
+      deletedRecords: state.deletedRecords,
+      restDays: state.restDays,
+      restDayUpdated: state.restDayUpdated,
+      wishlist: state.wishlist,
+      ledger: state.ledger
     });
 
     runtime.lastPersistAt = performance.now();
@@ -271,37 +338,87 @@
     return result.ok;
   }
 
-  function ensureCurrentDay() {
-    const today = W.todayKey();
-    if (session.date === today) return false;
+  function resolveWorkdayDate(nowMs) {
+    const today = W.localDateKey(new Date(nowMs));
+    const yesterday = offsetDateKey(today, -1);
+    const yesterdaySession = session.date === yesterday ? session : null;
+    const yesterdayConfig = yesterdaySession ? dayConfig(yesterdaySession) : settingsConfig();
+    const yesterdayWindow = shiftWindowFor(yesterday, yesterdayConfig);
+    if (
+      yesterdayWindow &&
+      yesterdayWindow.info.crossDay &&
+      nowMs >= yesterdayWindow.start &&
+      nowMs < yesterdayWindow.end
+    ) {
+      return yesterday;
+    }
+    return today;
+  }
 
-    const wasRunning = runtime.running;
-    if (wasRunning) {
-      const pausedMs = activeMilliseconds();
-      runtime.baseMs = pausedMs;
-      runtime.running = false;
-      runtime.runStartedAt = 0;
+  function finalizeSessionRecord(targetSession, nowMs) {
+    if (!targetSession) return null;
+    if (state.restDays && state.restDays[targetSession.date]) return null;
+    const tomb = Date.parse(state.deletedRecords && state.deletedRecords[targetSession.date]);
+    const existing = state.records[targetSession.date];
+    if (tomb && (!existing || Date.parse(existing.updatedAt) <= tomb)) return null;
+    const auto = autoForSession(targetSession, nowMs);
+    if (!auto || !auto.shiftEndMs) return null;
+    const cutoff = Math.min(nowMs, auto.shiftEndMs);
+    const record = buildRecordFor(targetSession, cutoff);
+    if (record) state.records[record.date] = record;
+    return record;
+  }
+
+  function backfillMissedWorkdays(activeDate, nowMs) {
+    if (!session || session.date >= activeDate) return;
+    const oldDate = session.date;
+    const dates = [];
+    let cursor = oldDate;
+    let guard = 0;
+    while (cursor < activeDate && guard < 31) {
+      dates.push(cursor);
+      cursor = offsetDateKey(cursor, 1);
+      guard += 1;
     }
 
-    const currentMs = activeMilliseconds();
-    const oldRecord = buildRecordFor(session, currentMs);
-    if (oldRecord) state.records[oldRecord.date] = oldRecord;
+    dates.forEach(function (date) {
+      if (state.restDays && state.restDays[date]) return;
+      const tomb = Date.parse(state.deletedRecords && state.deletedRecords[date]);
+      const existing = state.records[date];
+      if (tomb && (!existing || Date.parse(existing.updatedAt) <= tomb)) return;
+      const target = date === oldDate ? session : Store.createSession(date, state.settings);
+      if (date !== oldDate && state.records[date]) return;
+      const window = shiftWindowFor(date, dayConfig(target));
+      if (!window) return;
+      const record = buildRecordFor(target, window.end);
+      if (record) state.records[record.date] = record;
+    });
+  }
 
-    state.today = Store.createSession(today, state.settings);
+  function ensureCurrentWorkday(nowMs) {
+    const now = nowMs || Date.now();
+    const activeDate = resolveWorkdayDate(now);
+    if (session.date === activeDate) return false;
+
+    backfillMissedWorkdays(activeDate, now);
+    finalizeSessionRecord(session, now);
+
+    state.today = Store.createSession(activeDate, state.settings);
     session = state.today;
-    runtime.baseMs = 0;
-    runtime.running = false;
-    runtime.runStartedAt = 0;
     runtime.lastSecond = -1;
+    runtime.lastPhase = "";
     runtime.lastCents = null;
 
     persistState({ updateRecord: false, silent: true });
     renderAll();
-    showToast("检测到新的一天，今日计时已重新开始。", "info", 4000);
-
-    if (wasRunning) {
-      showToast("跨天后计时已自动暂停，请在新的一天重新开始。", "warning", 4200);
-    }
+    const isRest = Boolean(state.restDays && state.restDays[activeDate]);
+    showToast(
+      isRest
+        ? "新的一天是休息日，自动计薪不会启动；后天会自动恢复。"
+        : "已进入新的工作日，自动计薪已开启。",
+      "info",
+      3800
+    );
     return true;
   }
 
@@ -310,17 +427,19 @@
    * ======================================================= */
   function tick() {
     updateClock();
-    if (ensureCurrentDay()) return;
+    if (ensureCurrentWorkday()) return;
 
-    if (!runtime.running) return;
+    const auto = currentAuto();
+    if (!auto) return;
 
-    const seconds = activeSeconds();
-    if (seconds !== runtime.lastSecond) {
+    const seconds = auto.totalSeconds;
+    if (seconds !== runtime.lastSecond || auto.phase !== runtime.lastPhase) {
       runtime.lastSecond = seconds;
+      runtime.lastPhase = auto.phase;
       renderTodayLive();
     }
 
-    if (performance.now() - runtime.lastPersistAt >= 2000) {
+    if (performance.now() - runtime.lastPersistAt >= 5000) {
       persistState({ updateRecord: true, silent: true });
       renderSaveStateLabel();
     }
@@ -334,10 +453,10 @@
       dom.headerClock.textContent = text;
     }
 
-    const today = W.todayKey();
-    dom.todayDateLabel.textContent = W.formatFullDateCN(today);
-    dom.todayWeekdayLabel.textContent = W.formatWeekdayCN(today);
-    dom.heroDate.textContent = W.formatDateCN(today) + " · " + W.formatWeekdayCN(today, true);
+    const workday = session ? session.date : W.todayKey();
+    dom.todayDateLabel.textContent = W.formatFullDateCN(workday);
+    dom.todayWeekdayLabel.textContent = W.formatWeekdayCN(workday);
+    dom.heroDate.textContent = W.formatDateCN(workday) + " · " + W.formatWeekdayCN(workday, true);
   }
 
   /* =======================================================
@@ -346,7 +465,9 @@
   function renderAll() {
     renderTodayConfig();
     renderTodayLive();
+    renderGoalStrip();
     if (ui.view === "overview") renderOverview();
+    if (ui.view === "wishlist") renderWishlist();
     renderSettingsStats();
   }
 
@@ -384,7 +505,7 @@
       dom.progressFootLeft.textContent = "标准工时 " + W.formatDuration(info.seconds);
       dom.breakHint.textContent = info.breakEnabled
         ? "在岗 " + W.formatDurationTight(info.spanSeconds) + " · 扣除休息 " + W.formatDurationTight(info.breakSeconds) + " · 计薪 " + W.formatDurationTight(info.seconds)
-        : "开启后从标准工时中扣除休息时间；休息时请暂停计时。";
+        : "开启后从标准工时中扣除休息时间；休息时段自动不计薪。";
     } else {
       dom.breakHint.textContent = "当前休息时间不在工作时段内，请重新选择。";
     }
@@ -398,6 +519,16 @@
       dom.overtimeRuleDetail.textContent = "超出标准工时后，每秒按 " + multiplier + " 倍计算";
     }
 
+    const tomorrow = offsetDateKey(session.date, 1);
+    const restTomorrow = Boolean(state.restDays && state.restDays[tomorrow]);
+    const restingToday = Boolean(state.restDays && state.restDays[session.date]);
+    dom.restTomorrowToggle.checked = restTomorrow;
+    dom.restTomorrowHint.textContent = restingToday
+      ? "今日休息，自动计薪暂停；非休息日会自动恢复。"
+      : (restTomorrow
+        ? "明日不自动计薪；后天会自动恢复。"
+        : "明日会自动开始计薪；开启后明日暂停，后天恢复。");
+
     const rates = W.getRates(dayConfig());
     dom.dayBasePotential.textContent = "¥" + W.formatMoney(session.dailyWageCents);
     dom.dayOtPotential.textContent = rates
@@ -408,10 +539,11 @@
   }
 
   function renderTodayLive() {
-    const totalMs = activeMilliseconds();
-    const seconds = Math.floor(totalMs / 1000);
+    const auto = currentAuto();
+    const seconds = auto ? auto.totalSeconds : 0;
     const calc = currentPay();
     if (!calc || !calc.rates) return;
+    runtime.running = Boolean(auto && (auto.phase === "working" || auto.phase === "overtime"));
 
     const totalText = W.formatMoney(calc.totalCents);
     dom.liveAmount.textContent = totalText;
@@ -425,7 +557,7 @@
 
     dom.standardPay.textContent = "¥" + W.formatMoney(calc.standardCents);
     dom.overtimePay.textContent = "¥" + W.formatMoney(calc.overtimeCents);
-    dom.workedTime.textContent = W.formatDuration(seconds);
+    dom.workedTime.textContent = W.formatDuration(calc.workedSeconds);
     dom.standardMeta.textContent = "已完成 " + W.formatDuration(calc.standardWorkedSeconds);
     dom.overtimeMeta.textContent = session.overtimeEnabled
       ? "加班 " + W.formatDuration(calc.overtimeWorkedSeconds)
@@ -458,51 +590,84 @@
       dom.progressFootRight.textContent = "超出后按 " + rule + " 计费";
     }
 
-    renderStatus(calc, seconds);
-    renderControls(calc, seconds);
+    renderStatus(calc, auto);
+    renderControls(calc, auto);
+    renderGoalStrip();
   }
 
-  function renderStatus(calc, seconds) {
+  function renderStatus(calc, auto) {
     let statusClass = "is-idle";
-    let statusLabel = "等待开始";
+    let statusLabel = "自动计薪待命";
+    let live = false;
 
-    if (runtime.running) {
-      statusClass = "is-running";
-      statusLabel = "正在计薪";
-    } else if (seconds > 0) {
-      statusClass = "is-paused";
-      statusLabel = "已暂停";
+    if (auto) {
+      if (auto.phase === "rest") {
+        statusClass = "is-rest";
+        statusLabel = "今日休息";
+      } else if (auto.isPaused) {
+        statusClass = "is-paused";
+        statusLabel = "已暂停";
+      } else if (auto.phase === "before") {
+        statusClass = "is-idle";
+        statusLabel = "未到上班时间";
+      } else if (auto.phase === "break") {
+        statusClass = "is-break";
+        statusLabel = "休息中";
+      } else if (auto.phase === "overtime") {
+        statusClass = "is-running";
+        statusLabel = "加班自动计薪";
+        live = true;
+      } else if (auto.phase === "off") {
+        statusClass = "is-idle";
+        statusLabel = "今日已下班";
+      } else {
+        statusClass = "is-running";
+        statusLabel = "自动计薪中";
+        live = true;
+      }
     }
 
     dom.statusPill.className = "status-pill " + statusClass;
     dom.statusText.textContent = statusLabel;
+    dom.amountNote.classList.toggle("is-live", live);
 
-    dom.amountNote.classList.toggle("is-live", runtime.running);
-    let note = "点击开始，工资将按秒累计";
-
-    if (runtime.running) {
-      if (calc.workedSeconds >= calc.totalSeconds && !session.overtimeEnabled) {
-        note = "标准工时已满 · 开启今日加班可继续累计加班费";
-      } else if (calc.workedSeconds >= calc.totalSeconds && session.overtimeEnabled) {
-        note = "加班计费中 · 每秒 +¥" + W.formatPerSecond(calc.rates.overtimePerSecondCents);
+    let note = "根据班次时间自动计薪";
+    if (auto) {
+      if (auto.phase === "rest") {
+        note = "今日休息 · 不自动计薪；非休息日会继续自动开始";
+      } else if (auto.isPaused) {
+        note = "已暂停 · 金额冻结在 ¥" + W.formatMoney(calc.totalCents);
+      } else if (auto.phase === "before") {
+        note = "未到上班时间 · " + session.workStart + " 自动开始";
+      } else if (auto.phase === "break") {
+        note = "休息时段不计薪 · " + session.breakEnd + " 自动恢复";
+      } else if (auto.phase === "off") {
+        note = "今日班次已结束" + (session.overtimeEnabled ? " · 已到加班上限" : " · 开启今日加班可继续");
+      } else if (auto.phase === "overtime") {
+        note = "加班自动计薪中 · 每秒 +¥" + W.formatPerSecond(calc.rates.overtimePerSecondCents);
       } else {
-        note = "正在计薪 · 每秒 +¥" + W.formatPerSecond(calc.rates.standardPerSecondCents);
+        note = "自动计薪中 · 每秒 +¥" + W.formatPerSecond(calc.rates.standardPerSecondCents);
       }
-    } else if (seconds > 0) {
-      note = "已暂停 · 金额冻结在 ¥" + W.formatMoney(calc.totalCents);
     }
 
     dom.amountNoteText.textContent = note;
   }
 
-  function renderControls(calc, seconds) {
-    const hasProgress = activeMilliseconds() > 0;
-    dom.startBtn.disabled = runtime.running;
-    dom.startBtnText.textContent = runtime.running
-      ? "计薪中…"
-      : (hasProgress ? "继续计薪" : "开始计薪");
-    dom.pauseBtn.disabled = !runtime.running;
-    dom.resetBtn.disabled = !runtime.running && seconds === 0 && !state.records[session.date];
+  function renderControls(calc, auto) {
+    const hasProgress = Boolean(auto && auto.totalSeconds > 0) || Boolean(state.records[session.date]);
+    const rest = Boolean(auto && auto.phase === "rest");
+    const paused = Boolean(auto && auto.isPaused);
+    const waiting = Boolean(auto && auto.phase === "before");
+    const off = Boolean(auto && auto.phase === "off");
+    dom.startBtn.disabled = rest || waiting || off;
+    dom.startBtnText.textContent = rest
+      ? "今日休息"
+      : (paused ? "恢复自动计薪" : (waiting ? "等待自动开始" : (off ? "今日已下班" : "暂停今日计薪")));
+    if (dom.pauseBtn) {
+      dom.pauseBtn.hidden = true;
+      dom.pauseBtn.disabled = true;
+    }
+    dom.resetBtn.disabled = !hasProgress;
   }
 
   function animateAmount() {
@@ -675,7 +840,7 @@
       const dateCopy = document.createElement("span");
       dateCopy.className = "date-copy";
       const dateStrong = document.createElement("strong");
-      dateStrong.textContent = W.formatDateCN(record.date);
+      dateStrong.textContent = parsed.month + "月";
       const dateWeekday = document.createElement("span");
       dateWeekday.textContent = W.formatWeekdayCN(record.date);
       dateCopy.append(dateStrong, dateWeekday);
@@ -828,7 +993,7 @@
       "在岗 " + W.formatDurationTight(schedule.spanSeconds) +
       " · 扣除休息 " + W.formatDurationTight(schedule.breakSeconds) +
       " · 计薪 " + W.formatDurationTight(schedule.seconds) +
-      "，休息时请暂停计时。";
+      "，休息时段自动不计薪。";
   }
 
   function updateSettingsPreview() {
@@ -904,56 +1069,43 @@
   /* =======================================================
    * Controls
    * ======================================================= */
-  function startTimer() {
-    ensureCurrentDay();
-    if (runtime.running) return;
-    const current = activeMilliseconds();
-    runtime.baseMs = current;
-    runtime.runStartedAt = performance.now();
-    runtime.running = true;
-    runtime.lastSecond = Math.floor(current / 1000);
-    runtime.lastCents = null;
-
-    const calc = currentPay();
-    if (calc && calc.workedSeconds >= calc.totalSeconds && !session.overtimeEnabled) {
-      showToast("标准工时已经完成，先开启「今日加班」才会继续累计加班费。", "warning", 4200);
+  function toggleAutoPause() {
+    if (state.restDays && state.restDays[session.date]) {
+      showToast("今天是休息日，自动计薪不会启动。", "info");
+      return;
     }
-
-    persistState({ updateRecord: false, silent: true });
-    renderTodayLive();
-    renderSaveStateLabel();
-  }
-
-  function pauseTimer(options) {
-    if (!runtime.running) return;
-    const total = activeMilliseconds();
-    runtime.baseMs = total;
-    runtime.running = false;
-    runtime.runStartedAt = 0;
-    session.accumulatedMs = Math.floor(total);
-    session.wasRunning = false;
-
+    const now = Date.now();
+    const intervals = (session.pauseIntervals || []).slice();
+    const openIndex = intervals.findIndex(function (item) { return !item.end; });
+    if (openIndex >= 0) {
+      intervals[openIndex] = {
+        start: intervals[openIndex].start,
+        end: new Date(now).toISOString()
+      };
+      session.pauseIntervals = intervals;
+      showToast("已恢复自动计薪，暂停的这段时间不会计入工资。", "success", 3200);
+    } else {
+      intervals.push({ start: new Date(now).toISOString(), end: null });
+      session.pauseIntervals = intervals;
+      showToast("已暂停自动计薪，金额冻结；恢复后继续按班次时钟计算。", "info", 3200);
+    }
     persistState({ updateRecord: true, silent: true });
     nudgeCloudSync(0);
-    renderTodayLive();
-    renderSaveStateLabel();
-    if (!options || options.toast !== false) {
-      showToast("已暂停，金额已冻结。点击「继续计薪」可接着累计。", "info", 3200);
-    }
+    renderAll();
   }
 
   function requestResetToday() {
-    if (!runtime.running && activeSeconds() === 0 && !state.records[session.date]) {
-      showToast("今日还没有可以重置的计时。", "warning");
+    const auto = currentAuto();
+    const calc = currentPay();
+    if (!auto || (auto.totalSeconds === 0 && !state.records[session.date])) {
+      showToast("今日还没有可以重置的计薪进度。", "warning");
       return;
     }
 
-    const total = activeMilliseconds();
-    const calc = W.calcPay(dayConfig(), Math.floor(total / 1000));
     const amount = calc ? "¥" + W.formatMoney(calc.totalCents) : "¥0.00";
     showConfirm({
-      title: "重置今日计时？",
-      message: "将清空今日已累计的 " + W.formatDuration(Math.floor(total / 1000)) + " 和 " + amount + "，并删除今日工资记录。\n其他日期的记录和当前配置不会受影响。",
+      title: "重置今日自动计薪？",
+      message: "将清空今日已累计的 " + W.formatDuration(auto.totalSeconds) + " 和 " + amount + "，并从现在重新开始自动计薪。\n其他日期的记录和当前配置不会受影响。",
       confirmText: "确认重置"
     }).then(function (confirmed) {
       if (!confirmed) return;
@@ -962,13 +1114,16 @@
   }
 
   function resetToday() {
-    runtime.running = false;
-    runtime.runStartedAt = 0;
-    runtime.baseMs = 0;
-    runtime.lastSecond = 0;
-    runtime.lastCents = null;
+    const now = Date.now();
+    const auto = currentAuto(now);
+    const shiftStart = auto && auto.shiftStartMs ? auto.shiftStartMs : now;
+    session.pauseIntervals = now > shiftStart
+      ? [{ start: new Date(shiftStart).toISOString(), end: new Date(now).toISOString() }]
+      : [];
     session.accumulatedMs = 0;
     session.wasRunning = false;
+    runtime.lastSecond = 0;
+    runtime.lastCents = null;
     if (state.records[session.date]) {
       state.deletedRecords[session.date] = new Date().toISOString();
     }
@@ -976,7 +1131,7 @@
     persistState({ updateRecord: false, silent: true });
     nudgeCloudSync(0);
     renderAll();
-    showToast("今日计时已重置。", "success");
+    showToast("今日已从当前时刻重新开始自动计薪。", "success");
   }
 
   /* =======================================================
@@ -1196,6 +1351,23 @@
     }
   }
 
+  function onRestTomorrowToggle() {
+    const tomorrow = offsetDateKey(session.date, 1);
+    if (!state.restDays) state.restDays = {};
+    if (!state.restDayUpdated) state.restDayUpdated = {};
+    if (dom.restTomorrowToggle.checked) {
+      state.restDays[tomorrow] = true;
+      showToast("已设置明日休息：明日不会自动计薪，后天会自动恢复。", "success", 3800);
+    } else {
+      delete state.restDays[tomorrow];
+      showToast("已取消明日休息：明日会正常自动计薪。", "info", 3300);
+    }
+    state.restDayUpdated[tomorrow] = new Date().toISOString();
+    persistState({ updateRecord: true, silent: true });
+    nudgeCloudSync(0);
+    renderAll();
+  }
+
   function setFieldError(input, errorElement, message) {
     const hasError = Boolean(message);
     if (input) {
@@ -1219,6 +1391,327 @@
     setFieldError(dom.workStartInput, dom.timeError, "");
     setFieldError(dom.workEndInput, dom.timeError, "");
     setDayBreakError("");
+  }
+
+  /* =======================================================
+   * SU7 wishlist, daily ledger and AI coach
+   * ======================================================= */
+  function activeLedgerEntries() {
+    return Object.keys(state.ledger || {})
+      .map(function (id) { return state.ledger[id]; })
+      .filter(function (entry) { return entry && !entry.deleted; });
+  }
+
+  function wishlistAnalysis() {
+    if (!window.FinanceAI) {
+      return null;
+    }
+    return window.FinanceAI.analyze({
+      todayKey: W.todayKey(),
+      targetCents: state.wishlist.targetCents,
+      initialSavedCents: state.wishlist.initialSavedCents,
+      records: state.records,
+      ledger: state.ledger,
+      dailyWageCents: session ? session.dailyWageCents : state.settings.defaultDailyWageCents
+    });
+  }
+
+  function renderGoalStrip(analysis) {
+    if (!dom.goalStrip) return;
+    const result = analysis || wishlistAnalysis();
+    if (!result) return;
+    dom.goalStripTitle.textContent = state.wishlist.title || "小米 SU7";
+    dom.goalStripGap.textContent = "¥" + W.formatMoney(result.gapCents);
+    dom.goalStripSaved.textContent = "¥" + W.formatMoney(result.savedCents);
+    dom.goalStripTarget.textContent = "¥" + W.formatMoney(state.wishlist.targetCents);
+    dom.goalStripPercent.textContent = Math.round(result.progress) + "%";
+    dom.goalStripFill.style.width = W.clamp(result.progress, 0, 100).toFixed(2) + "%";
+    if (result.gapCents === 0) {
+      dom.goalStripHeadline.textContent = "SU7 目标已经达成";
+    } else {
+      dom.goalStripHeadline.innerHTML = '距离目标还差 <strong id="goalStripGap">¥' + W.formatMoney(result.gapCents) + '</strong>';
+      dom.goalStripGap = $("goalStripGap");
+    }
+  }
+
+  function etaLabel(result) {
+    if (result.gapCents === 0) return { value: "已达成", sub: "可以设定下一个目标" };
+    if (!result.etaDays) return { value: "待积累", sub: "保持正结余后开始预测" };
+    return {
+      value: "约 " + result.etaDays + " 天",
+      sub: W.formatDateCN(result.etaDate) + " 达成"
+    };
+  }
+
+  function renderWishlist(analysis) {
+    if (!state.wishlist) return;
+    const result = analysis || wishlistAnalysis();
+    if (!result) return;
+    dom.wishlistTitle.textContent = state.wishlist.title || "小米 SU7";
+    dom.wishlistSubtitle.textContent = state.wishlist.subtitle || "";
+    dom.wishlistHeroTarget.textContent = "¥" + W.formatMoney(state.wishlist.targetCents);
+    dom.wishlistHeroSaved.textContent = "¥" + W.formatMoney(result.savedCents);
+    dom.wishlistSaved.textContent = "¥" + W.formatMoney(result.savedCents);
+    dom.wishlistGap.textContent = "¥" + W.formatMoney(result.gapCents);
+    const workdays = result.gapCents > 0 && session && session.dailyWageCents > 0
+      ? Math.ceil(result.gapCents / session.dailyWageCents)
+      : 0;
+    dom.wishlistGapSub.textContent = result.gapCents === 0
+      ? "心愿单已经攒满"
+      : (workdays ? "约 " + workdays + " 个工作日" : "从第一笔工资开始");
+    dom.wishlistProgress.textContent = result.progress.toFixed(1).replace(/\.0$/, "") + "%";
+    dom.wishlistProgressFill.style.width = W.clamp(result.progress, 0, 100).toFixed(2) + "%";
+    dom.wishlistProgressSub.textContent = "目标 ¥" + W.formatMoney(state.wishlist.targetCents);
+    const eta = etaLabel(result);
+    dom.wishlistEta.textContent = eta.value;
+    dom.wishlistEtaSub.textContent = eta.sub;
+
+    renderGoalStrip(result);
+    renderLedger(result);
+    renderAiInsights(result);
+
+    if (document.activeElement !== dom.wishlistTargetInput) {
+      dom.wishlistTargetInput.value = (state.wishlist.targetCents / 100).toFixed(2);
+    }
+    if (document.activeElement !== dom.wishlistInitialInput) {
+      dom.wishlistInitialInput.value = (state.wishlist.initialSavedCents / 100).toFixed(2);
+    }
+    dom.ledgerDate.max = W.todayKey();
+    if (!dom.ledgerDate.value) dom.ledgerDate.value = W.todayKey();
+    populateLedgerCategories();
+  }
+
+  function renderLedger(analysis) {
+    const result = analysis || wishlistAnalysis();
+    if (!result) return;
+    dom.ledgerMonthExpense.textContent = "¥" + W.formatMoney(result.monthExpenseCents);
+    dom.ledgerMonthIncome.textContent = "¥" + W.formatMoney(result.monthIncomeCents);
+    dom.ledgerMonthNet.textContent = "¥" + W.formatMoney(result.monthNetCents);
+    dom.ledgerMonthNet.classList.toggle("is-positive", result.monthNetCents > 0);
+    dom.ledgerMonthNet.classList.toggle("is-negative", result.monthNetCents < 0);
+
+    const entries = activeLedgerEntries().sort(function (a, b) {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      return String(b.createdAt).localeCompare(String(a.createdAt));
+    });
+    dom.ledgerCount.textContent = entries.length + " 笔";
+    dom.ledgerList.replaceChildren();
+    dom.ledgerEmpty.hidden = entries.length > 0;
+    entries.slice(0, 40).forEach(function (entry) {
+      const row = document.createElement("div");
+      row.className = "ledger-row";
+      row.dataset.ledgerId = entry.id;
+
+      const date = document.createElement("span");
+      date.className = "ledger-date";
+      date.textContent = W.formatDateCN(entry.date);
+      row.appendChild(date);
+
+      const category = document.createElement("span");
+      category.className = "ledger-cat";
+      category.textContent = entry.category;
+      row.appendChild(category);
+
+      const note = document.createElement("span");
+      note.className = "ledger-note";
+      note.textContent = entry.note || (entry.type === "income" ? "收入" : "支出");
+      row.appendChild(note);
+
+      const amount = document.createElement("strong");
+      amount.className = "ledger-amount " + (entry.type === "income" ? "is-income" : "is-expense");
+      amount.textContent = (entry.type === "income" ? "+" : "−") + "¥" + W.formatMoney(entry.amountCents);
+      row.appendChild(amount);
+
+      const remove = document.createElement("button");
+      remove.className = "ledger-delete";
+      remove.type = "button";
+      remove.dataset.deleteLedger = entry.id;
+      remove.setAttribute("aria-label", "删除这笔" + (entry.type === "income" ? "收入" : "支出"));
+      remove.textContent = "×";
+      row.appendChild(remove);
+
+      dom.ledgerList.appendChild(row);
+    });
+  }
+
+  function renderAiInsights(analysis) {
+    const result = analysis || wishlistAnalysis();
+    if (!result || !dom.aiInsights) return;
+    dom.aiInsights.replaceChildren();
+
+    if (ui.aiAdviceLoading || ui.aiAdvice) {
+      const article = document.createElement("article");
+      article.className = "ai-insight tone-ai";
+      const tag = document.createElement("span");
+      tag.className = "ai-tag";
+      tag.textContent = ui.aiAdviceLoading ? "AI COACH · THINKING" : "AI COACH · ONLINE";
+      const title = document.createElement("h3");
+      title.textContent = ui.aiAdviceLoading ? "AI 正在读你的攒钱节奏" : "AI 给你的三句话";
+      const text = document.createElement("p");
+      text.textContent = ui.aiAdviceLoading
+        ? "正在把目标差距、消费结构和达成预测整理成一段建议…"
+        : ui.aiAdvice;
+      article.append(tag, title, text);
+      dom.aiInsights.appendChild(article);
+    }
+
+    result.insights.forEach(function (insight) {
+      const article = document.createElement("article");
+      article.className = "ai-insight tone-" + insight.tone;
+      const tag = document.createElement("span");
+      tag.className = "ai-tag";
+      tag.textContent = insight.tag;
+      const title = document.createElement("h3");
+      title.textContent = insight.title;
+      const text = document.createElement("p");
+      text.textContent = insight.text;
+      article.appendChild(tag);
+      article.appendChild(title);
+      article.appendChild(text);
+      dom.aiInsights.appendChild(article);
+    });
+    const count = result.insights.length;
+    dom.aiStatus.textContent = ui.aiAdviceLoading
+      ? "AI 在线分析中"
+      : (ui.aiAdvice ? "在线 AI 已生成" : "本地智能分析 · " + count + " 条");
+    if (dom.aiDeepBtn) {
+      dom.aiDeepBtn.disabled = ui.aiAdviceLoading;
+      dom.aiDeepBtn.textContent = ui.aiAdviceLoading ? "AI 分析中…" : "AI 深度分析 ✦";
+    }
+  }
+
+  async function handleDeepAi() {
+    if (ui.aiAdviceLoading) return;
+    if (!window.FinanceAI || typeof window.FinanceAI.remoteAdvice !== "function") {
+      showToast("当前浏览器无法使用在线 AI，请继续查看本地建议。", "warning", 3400);
+      return;
+    }
+    const confirmed = await showConfirm({
+      title: "使用在线 AI 深度分析？",
+      message: "将向 Pollinations 在线模型发送目标金额、已攒金额、支出分类等汇总数字，用于生成个性化建议。\n不会发送姓名、成员称呼、备注或逐笔明细。",
+      confirmText: "开始在线分析"
+    });
+    if (!confirmed) return;
+    const analysis = wishlistAnalysis();
+    if (!analysis) return;
+    ui.aiAdviceLoading = true;
+    ui.aiAdvice = "";
+    renderWishlist();
+    try {
+      const advice = await window.FinanceAI.remoteAdvice(analysis, state.wishlist.targetCents);
+      ui.aiAdvice = advice;
+      showToast("在线 AI 已根据汇总数据生成建议。", "success", 3200);
+    } catch (error) {
+      showToast("在线 AI 暂时不可用，已保留本地智能建议。", "warning", 4200);
+    } finally {
+      ui.aiAdviceLoading = false;
+      renderWishlist();
+    }
+  }
+
+  const EXPENSE_CATEGORIES = ["餐饮", "交通", "购物", "居住", "娱乐", "学习", "医疗", "其他支出"];
+  const INCOME_CATEGORIES = ["其他收入", "红包", "奖金", "理财", "退款"];
+
+  function populateLedgerCategories() {
+    if (!dom.ledgerCategory) return;
+    const type = dom.ledgerTypeIncome.checked ? "income" : "expense";
+    const list = type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+    const previous = dom.ledgerCategory.value;
+    dom.ledgerCategory.replaceChildren();
+    list.forEach(function (name) {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      dom.ledgerCategory.appendChild(option);
+    });
+    if (list.indexOf(previous) >= 0) dom.ledgerCategory.value = previous;
+    ui.ledgerType = type;
+  }
+
+  function handleLedgerSubmit(event) {
+    if (event) event.preventDefault();
+    const date = dom.ledgerDate.value || W.todayKey();
+    if (!W.parseDateKey(date)) {
+      setFieldError(null, dom.ledgerError, "请选择有效的日期。");
+      return;
+    }
+    const parsed = W.parseMoneyToCents(dom.ledgerAmount.value);
+    if (!parsed.ok) {
+      setFieldError(null, dom.ledgerError, parsed.error);
+      dom.ledgerAmount.focus();
+      return;
+    }
+    setFieldError(null, dom.ledgerError, "");
+    const type = dom.ledgerTypeIncome.checked ? "income" : "expense";
+    const category = dom.ledgerCategory.value || (type === "income" ? "其他收入" : "其他支出");
+    const note = dom.ledgerNote.value.trim();
+    const id = "led-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
+    const now = new Date().toISOString();
+    state.ledger[id] = {
+      id: id,
+      date: date,
+      type: type,
+      category: category,
+      amountCents: parsed.cents,
+      note: note,
+      deleted: false,
+      createdAt: now,
+      updatedAt: now
+    };
+    ui.aiAdvice = "";
+    persistState({ updateRecord: false, silent: true });
+    nudgeCloudSync(0);
+    dom.ledgerAmount.value = "";
+    dom.ledgerNote.value = "";
+    renderWishlist();
+    renderGoalStrip();
+    showToast(type === "income" ? "收入已记入心愿单。" : "支出已记入账本，AI 教练已更新建议。", "success", 3000);
+  }
+
+  function deleteLedgerEntry(id) {
+    const entry = state.ledger && state.ledger[id];
+    if (!entry || entry.deleted) return;
+    showConfirm({
+      title: "删除这笔记录？",
+      message: "将删除 " + W.formatDateCN(entry.date) + " 的「" + entry.category + "」" + (entry.type === "income" ? "收入" : "支出") + " ¥" + W.formatMoney(entry.amountCents) + "。",
+      confirmText: "确认删除"
+    }).then(function (confirmed) {
+      if (!confirmed) return;
+      entry.deleted = true;
+      entry.updatedAt = new Date().toISOString();
+      ui.aiAdvice = "";
+      persistState({ updateRecord: false, silent: true });
+      nudgeCloudSync(0);
+      renderWishlist();
+      showToast("记录已删除，心愿进度已重新计算。", "success", 2800);
+    });
+  }
+
+  function handleWishlistConfigSubmit(event) {
+    if (event) event.preventDefault();
+    const target = W.parseMoneyToCents(dom.wishlistTargetInput.value);
+    if (!target.ok) {
+      setFieldError(null, dom.wishlistConfigError, "目标金额：" + target.error);
+      return;
+    }
+    const initialInput = String(dom.wishlistInitialInput.value || "0").replace(/,/g, "").trim();
+    const initialNumber = Number(initialInput);
+    const initial = initialInput === "" || (Number.isFinite(initialNumber) && initialNumber === 0)
+      ? { ok: true, cents: 0 }
+      : W.parseMoneyToCents(initialInput);
+    if (!initial.ok) {
+      setFieldError(null, dom.wishlistConfigError, "已有存款：" + initial.error);
+      return;
+    }
+    setFieldError(null, dom.wishlistConfigError, "");
+    state.wishlist.targetCents = target.cents;
+    state.wishlist.initialSavedCents = initial.cents;
+    state.wishlist.updatedAt = new Date().toISOString();
+    ui.aiAdvice = "";
+    persistState({ updateRecord: false, silent: true });
+    nudgeCloudSync(0);
+    renderWishlist();
+    showToast("心愿目标已更新。", "success", 2800);
   }
 
   /* =======================================================
@@ -1349,7 +1842,7 @@
     if (appliedToToday) {
       showToast("设置已保存，并已应用到今日配置。", "success", 3600);
     } else {
-      showToast("设置已保存，加班费标准已立即生效；今日已有计时，原有日薪、工时和休息设置保持不变。", "success", 4600);
+      showToast("设置已保存，加班费标准已立即生效；今日已有计薪进度，原有日薪、工时和休息设置保持不变。", "success", 4600);
     }
   }
 
@@ -1405,7 +1898,7 @@
     if (!record) return;
     const isToday = dateKey === session.date;
     const message = "将删除 " + W.formatDateWithWeekday(dateKey, false) + " 的工资记录，合计 ¥" + W.formatMoney(record.totalPayCents) + "。"
-      + (isToday ? "\n今日计时也会一并重置，其他日期不受影响。" : "\n此操作无法撤销。");
+      + (isToday ? "\n今日自动计薪也会从当前时刻重置，其他日期不受影响。" : "\n此操作无法撤销。");
 
     showConfirm({
       title: isToday ? "删除今日记录？" : "删除这一天的记录？",
@@ -1415,9 +1908,12 @@
       if (!confirmed) return;
 
       if (isToday) {
-        runtime.running = false;
-        runtime.runStartedAt = 0;
-        runtime.baseMs = 0;
+        const now = Date.now();
+        const auto = currentAuto(now);
+        const shiftStart = auto && auto.shiftStartMs ? auto.shiftStartMs : now;
+        session.pauseIntervals = now > shiftStart
+          ? [{ start: new Date(shiftStart).toISOString(), end: new Date(now).toISOString() }]
+          : [];
         runtime.lastSecond = 0;
         runtime.lastCents = null;
         session.accumulatedMs = 0;
@@ -1494,7 +1990,7 @@
    * ======================================================= */
   function activateView(view, options) {
     const opts = options || {};
-    if (view !== "today" && view !== "overview" && view !== "settings") {
+    if (view !== "today" && view !== "overview" && view !== "wishlist" && view !== "settings") {
       view = "today";
     }
     ui.view = view;
@@ -1519,6 +2015,9 @@
     } else if (view === "today") {
       renderTodayConfig();
       renderTodayLive();
+      renderGoalStrip();
+    } else if (view === "wishlist") {
+      renderWishlist();
     } else if (view === "settings") {
       renderSettingsStats();
       updateSettingsPreview();
@@ -1621,7 +2120,11 @@
       settings: state.settings,
       settingsUpdatedAt: state.settingsUpdatedAt,
       records: state.records,
-      deletedRecords: state.deletedRecords || {}
+      deletedRecords: state.deletedRecords || {},
+      restDays: state.restDays || {},
+      restDayUpdated: state.restDayUpdated || {},
+      wishlist: state.wishlist,
+      ledger: state.ledger || {}
     };
   }
 
@@ -1751,12 +2254,12 @@
   }
 
   function hydrateSessionFromMember(member) {
-    const today = W.todayKey();
-    const record = member.records && member.records[today];
+    const activeDate = resolveWorkdayDate(Date.now());
+    const record = member.records && member.records[activeDate];
     let next;
     if (record) {
       next = {
-        date: today,
+        date: activeDate,
         dailyWageCents: record.dailyWageCents,
         workStart: record.workStart,
         workEnd: record.workEnd,
@@ -1764,19 +2267,21 @@
         breakStart: record.breakStart,
         breakEnd: record.breakEnd,
         overtimeEnabled: Boolean(record.overtimeEnabled),
+        pauseIntervals: record.pauseIntervals || [],
         accumulatedMs: Math.max(0, Number(record.workedSeconds) || 0) * 1000,
         wasRunning: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
     } else {
-      next = Store.createSession(today, member.settings);
+      next = Store.createSession(activeDate, member.settings);
     }
 
     runtime.running = false;
     runtime.runStartedAt = 0;
-    runtime.baseMs = next.accumulatedMs;
-    runtime.lastSecond = Math.floor(next.accumulatedMs / 1000);
+    runtime.baseMs = 0;
+    runtime.lastSecond = -1;
+    runtime.lastPhase = "";
     runtime.lastCents = null;
     state.today = next;
     session = next;
@@ -1794,6 +2299,10 @@
     state.settingsUpdatedAt = member.settingsUpdatedAt;
     state.records = member.records;
     state.deletedRecords = member.deletedRecords;
+    state.restDays = member.restDays || {};
+    state.restDayUpdated = member.restDayUpdated || {};
+    state.wishlist = member.wishlist || state.wishlist;
+    state.ledger = member.ledger || {};
 
     if (needsHydrate) {
       hydrateSessionFromMember(member);
@@ -1807,6 +2316,8 @@
     renderAll();
     if (source === "join" || previousKey !== member.id) {
       ui.cloudMemberScope = "me";
+      ui.aiAdvice = "";
+      ui.aiAdviceLoading = false;
     }
     updateCloudStatus(window.CloudSync.getStatus());
   }
@@ -2123,7 +2634,7 @@
   function requestClearData() {
     const count = Object.keys(state.records).length;
     const connected = window.CloudSync && window.CloudSync.isConnected();
-    const message = "将永久删除本地保存的 " + count + " 条日工资记录、今日计时进度和全部设置。"
+    const message = "将永久删除本地保存的 " + count + " 条日工资记录、今日计薪进度、心愿单和全部设置。"
       + (connected ? "\n当前共享空间不会被删除，本机会同时退出共享空间。" : "")
       + "\n此操作无法撤销，建议确认无误后再继续。";
 
@@ -2174,8 +2685,10 @@
       });
     });
 
-    dom.startBtn.addEventListener("click", startTimer);
-    dom.pauseBtn.addEventListener("click", function () { pauseTimer(); });
+    dom.startBtn.addEventListener("click", toggleAutoPause);
+    if (dom.pauseBtn) {
+      dom.pauseBtn.addEventListener("click", toggleAutoPause);
+    }
     dom.resetBtn.addEventListener("click", requestResetToday);
 
     dom.dailyWageInput.addEventListener("change", applyDailyWage);
@@ -2185,6 +2698,27 @@
     dom.breakStartInput.addEventListener("change", applyBreakTimes);
     dom.breakEndInput.addEventListener("change", applyBreakTimes);
     dom.overtimeToggle.addEventListener("change", onOvertimeToggle);
+    dom.restTomorrowToggle.addEventListener("change", onRestTomorrowToggle);
+
+    dom.goalJumpBtn.addEventListener("click", function () {
+      activateView("wishlist", { updateHash: true });
+    });
+    dom.ledgerForm.addEventListener("submit", handleLedgerSubmit);
+    dom.ledgerTypeExpense.addEventListener("change", populateLedgerCategories);
+    dom.ledgerTypeIncome.addEventListener("change", populateLedgerCategories);
+    dom.ledgerAmount.addEventListener("input", function () { setFieldError(null, dom.ledgerError, ""); });
+    dom.ledgerList.addEventListener("click", function (event) {
+      const button = event.target.closest("[data-delete-ledger]");
+      if (button) deleteLedgerEntry(button.dataset.deleteLedger);
+    });
+    dom.aiRefreshBtn.addEventListener("click", function () {
+      renderWishlist();
+      showToast("AI 财务教练已根据最新账本重新分析。", "success", 2600);
+    });
+    dom.aiDeepBtn.addEventListener("click", handleDeepAi);
+    dom.wishlistConfigForm.addEventListener("submit", handleWishlistConfigSubmit);
+    dom.wishlistTargetInput.addEventListener("input", function () { setFieldError(null, dom.wishlistConfigError, ""); });
+    dom.wishlistInitialInput.addEventListener("input", function () { setFieldError(null, dom.wishlistConfigError, ""); });
 
     [dom.dailyWageInput, dom.workStartInput, dom.workEndInput, dom.breakStartInput, dom.breakEndInput].forEach(function (input) {
       input.addEventListener("input", clearDayErrors);
@@ -2258,8 +2792,10 @@
       if (document.visibilityState === "hidden") {
         persistState({ updateRecord: true, silent: true, cloudDirty: false });
       } else {
+        ensureCurrentWorkday();
         updateClock();
         if (ui.view === "today") renderTodayLive();
+        persistState({ updateRecord: true, silent: true });
       }
     });
 

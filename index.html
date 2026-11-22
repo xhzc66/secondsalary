@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#9f3025">
-  <meta name="description" content="按秒计薪工资计算器：实时累计工资、休息时间扣除、加班费、按月总览，并支持多人加密共享工资簿。数据可保存在本机或通过 KVdb 端到端加密同步。">
-  <title>秒薪 · 按秒计薪工资计算器</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='4' fill='%239f3025'/%3E%3Crect x='4' y='4' width='56' height='56' rx='2' fill='none' stroke='%23f3dfb8' stroke-opacity='.55'/%3E%3Ctext x='32' y='45' text-anchor='middle' font-size='34' font-family='KaiTi,serif' fill='%23f8ead3'%3E%E7%A7%92%3C/text%3E%3C/svg%3E">
+  <meta name="theme-color" content="#0a0a0b">
+  <meta name="description" content="按秒自动计薪、SU7 心愿单、每日记账与 AI 财务教练。支持休息日、加班费、月度总览和多人加密共享。">
+  <title>秒薪 · SU7 心愿工资簿</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0b'/%3E%3Crect x='2' y='2' width='60' height='60' rx='12' fill='none' stroke='%23e8b15c' stroke-opacity='.7'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-size='32' font-family='Arial,sans-serif' font-weight='700' fill='%23f4f1ea'%3E%E7%A7%92%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -20,7 +20,7 @@
         </span>
         <span class="brand-copy">
           <span class="brand-name">秒薪</span>
-          <span class="brand-tagline">寸阴寸金</span>
+          <span class="brand-tagline">SU7 心愿簿</span>
         </span>
       </a>
 
@@ -32,6 +32,10 @@
         <button class="tab-button" type="button" data-view="overview">
           <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3.25" y="4.25" width="13.5" height="12.5" rx="2.2" stroke="currentColor" stroke-width="1.6"/><path d="M6.5 2.75v3M13.5 2.75v3M3.25 8h13.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M7 11.5h2M11 11.5h2M7 14h2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
           工资总览
+        </button>
+        <button class="tab-button" type="button" data-view="wishlist">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3.2 12.8h13.6M4.7 12.8l1.1-4.2a2 2 0 0 1 1.9-1.5h4.6a2 2 0 0 1 1.9 1.5l1.1 4.2M5.4 15.3v1.1M14.6 15.3v1.1M6.2 12.8h7.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 7.1V5.8a2 2 0 0 1 4 0v1.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          SU7 心愿
         </button>
         <button class="tab-button" type="button" data-view="settings">
           <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 6.75A3.25 3.25 0 1 0 10 13.25 3.25 3.25 0 0 0 10 6.75Z" stroke="currentColor" stroke-width="1.6"/><path d="M16.1 11.2a6.8 6.8 0 0 0 0-2.4l1.3-1-1.5-2.6-1.6.6a6.8 6.8 0 0 0-2.1-1.2L12 2.8H9L8.8 4.6a6.8 6.8 0 0 0-2.1 1.2l-1.6-.6-1.5 2.6 1.3 1a6.8 6.8 0 0 0 0 2.4l-1.3 1 1.5 2.6 1.6-.6a6.8 6.8 0 0 0 2.1 1.2l.2 1.8h3l.2-1.8a6.8 6.8 0 0 0 2.1-1.2l1.6.6 1.5-2.6-1.3-1Z" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/></svg>
@@ -54,7 +58,7 @@
         <div class="view-heading">
           <div>
             <p class="eyebrow"><span id="todayDateLabel">今天</span><span class="eyebrow-separator"></span><span id="todayWeekdayLabel">星期五</span></p>
-            <h1 id="todayHeading">今天的每一秒，<span class="heading-emphasis"><span class="brush-text">都在进账。</span></span></h1>
+            <h1 id="todayHeading">今天的每一秒，<span class="heading-emphasis"><span class="brush-text">都在靠近 SU7。</span></span></h1>
           </div>
           <div class="heading-aside">
             <span class="save-state" id="saveIndicator">
@@ -67,38 +71,24 @@
 
         <div class="today-grid">
           <section class="pay-hero" aria-labelledby="liveAmountLabel">
-            <div class="hero-scenery" aria-hidden="true">
-              <span class="hero-sun"></span>
-              <svg class="hero-mountains" viewBox="0 0 900 280" preserveAspectRatio="none" focusable="false">
-                <path d="M0 236 C62 220 96 184 154 196 C212 208 234 166 292 182 C350 198 382 148 442 166 C502 184 524 216 592 200 C660 184 700 146 762 168 C822 190 862 218 900 204 L900 280 L0 280Z" fill="#8a8272" opacity=".21"/>
-                <path d="M0 258 C54 244 82 216 134 226 C186 236 214 192 268 208 C322 224 356 178 412 194 C468 210 506 242 566 226 C626 210 662 174 718 194 C774 214 832 246 900 230 L900 280 L0 280Z" fill="#45453c" opacity=".28"/>
-                <path d="M0 280 C42 270 76 248 122 254 C168 260 206 234 252 244 C298 254 338 228 384 240 C434 252 474 272 530 260 C586 248 624 218 674 234 C724 250 764 270 814 258 C854 248 878 240 900 246 L900 280Z" fill="#1f211b" opacity=".36"/>
-                <path d="M64 214 C168 202 232 214 304 196 C380 178 436 204 502 188" fill="none" stroke="#b4873f" stroke-width="1.2" opacity=".42" stroke-linecap="round"/>
-                <path d="M548 246 C614 236 658 214 710 222 C762 230 818 252 866 242" fill="none" stroke="#b4873f" stroke-width="1" opacity=".34" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <div class="hero-verse" aria-hidden="true">
-              <span class="verse-text">一寸光阴一寸金</span>
-              <span class="verse-seal">日进<br>斗金</span>
-            </div>
+            <div class="hero-car-glow" aria-hidden="true"></div>
             <div class="hero-topline">
               <span class="status-pill is-idle" id="statusPill">
                 <span class="status-dot" aria-hidden="true"></span>
-                <span id="statusText">等待开始</span>
+                <span id="statusText">自动计薪待命</span>
               </span>
               <span class="hero-date" id="heroDate">--月--日</span>
             </div>
 
             <div class="amount-block">
-              <span class="amount-seal" aria-hidden="true">进账</span>
-              <p class="amount-label" id="liveAmountLabel">当前累计工资</p>
+              <p class="amount-label" id="liveAmountLabel">今日自动累计</p>
               <div class="amount-line">
                 <span class="amount-currency" aria-hidden="true">¥</span>
                 <span class="amount-value" id="liveAmount">0.00</span>
               </div>
               <p class="amount-note" id="amountNote">
                 <span class="note-pulse" id="notePulse" aria-hidden="true"></span>
-                <span id="amountNoteText">点击开始，工资将按秒累计</span>
+                <span id="amountNoteText">根据班次时间自动计薪</span>
               </p>
             </div>
 
@@ -141,18 +131,17 @@
             </div>
 
             <div class="hero-controls">
-              <button class="button button-primary" id="startBtn" type="button">
-                <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M6.2 4.1v9.8l7.5-4.9-7.5-4.9Z" fill="currentColor"/></svg>
-                <span id="startBtnText">开始计薪</span>
-              </button>
-              <button class="button button-ghost" id="pauseBtn" type="button" disabled>
-                <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M6 4.2v9.6M12 4.2v9.6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
-                暂停
-              </button>
-              <button class="button button-quiet" id="resetBtn" type="button" disabled>
-                <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M4.1 6.6A6 6 0 1 1 3.3 11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M4.2 2.9v3.9h3.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                重置
-              </button>
+              <span class="auto-running-badge"><span aria-hidden="true"></span> 自动计薪 · 离开页面也会继续</span>
+              <div class="hero-control-buttons">
+                <button class="button button-primary" id="startBtn" type="button">
+                  <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M6 4.2v9.6M12 4.2v9.6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+                  <span id="startBtnText">暂停今日计薪</span>
+                </button>
+                <button class="button button-quiet" id="resetBtn" type="button" disabled>
+                  <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M4.1 6.6A6 6 0 1 1 3.3 11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M4.2 2.9v3.9h3.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  重置
+                </button>
+              </div>
             </div>
           </section>
 
@@ -214,7 +203,7 @@
                 </div>
                 <span class="break-off-label" id="breakOffLabel">未扣除</span>
               </div>
-              <p class="field-hint break-hint" id="breakHint">开启后从标准工时中扣除休息时间；休息时请暂停计时。</p>
+              <p class="field-hint break-hint" id="breakHint">开启后从标准工时中扣除休息时间；休息时段自动不计薪。</p>
               <p class="field-error" id="breakError" hidden></p>
             </div>
 
@@ -241,6 +230,17 @@
               </div>
             </div>
 
+            <div class="rest-tomorrow-card">
+              <div class="rest-tomorrow-copy">
+                <span class="field-label">明日休息</span>
+                <p class="field-hint" id="restTomorrowHint">明日会自动开始计薪；开启后明日暂停，后天恢复。</p>
+              </div>
+              <label class="switch" for="restTomorrowToggle">
+                <input id="restTomorrowToggle" type="checkbox" role="switch" aria-label="明日是否休息">
+                <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+              </label>
+            </div>
+
             <div class="day-potential" id="dayPotential">
               <div>
                 <span>完整标准工时可得</span>
@@ -262,23 +262,21 @@
           </aside>
         </div>
 
-        <section class="formula-strip" aria-label="计薪说明">
-          <div class="formula-item">
-            <span class="formula-index">壹</span>
-            <div><strong>标准秒薪</strong><p>每日基本工资 ÷ 标准工作秒数</p></div>
+        <section class="goal-strip" id="goalStrip" aria-label="SU7 心愿进度">
+          <div class="goal-strip-car">
+            <img src="assets/su7.jpg" alt="小米 SU7 雅灰" loading="lazy">
           </div>
-          <div class="formula-item">
-            <span class="formula-index">贰</span>
-            <div><strong>自动切换加班</strong><p>计时超过标准工时后启用加班费规则</p></div>
+          <div class="goal-strip-copy">
+            <span class="eyebrow"><span>SU7 WISH LIST</span><span class="eyebrow-separator"></span><span id="goalStripTitle">小米 SU7</span></span>
+            <h2 id="goalStripHeadline">距离目标还差 <strong id="goalStripGap">¥235,900.00</strong></h2>
+            <div class="goal-progress-track" aria-hidden="true"><span id="goalStripFill"></span></div>
+            <div class="goal-strip-meta">
+              <span>已攒 <b id="goalStripSaved">¥0.00</b></span>
+              <span id="goalStripPercent">0%</span>
+              <span>目标 <b id="goalStripTarget">¥235,900.00</b></span>
+            </div>
           </div>
-          <div class="formula-item">
-            <span class="formula-index">叁</span>
-            <div><strong>精确到厘</strong><p>内部以高精度整数计算，展示保留 2 位小数</p></div>
-          </div>
-          <div class="formula-item">
-            <span class="formula-index">肆</span>
-            <div><strong>本地持久化</strong><p>刷新、关闭页面后记录仍然保留</p></div>
-          </div>
+          <button class="button button-gold is-small" id="goalJumpBtn" type="button">去记账 <span aria-hidden="true">→</span></button>
         </section>
       </section>
 
@@ -413,14 +411,178 @@
               </span>
             </div>
             <h3>这个月还没有工资记录</h3>
-            <p>去「今日计薪」开始计时，每一秒都会被自动记录。</p>
-            <button class="button button-primary is-small" type="button" data-go-today>去开始计时</button>
+            <p>自动计薪会按班次时间记录每一天，休息日可以提前标记。</p>
+            <button class="button button-primary is-small" type="button" data-go-today>回到今日计薪</button>
           </div>
 
           <div class="records-foot">
-            <span>仅展示有计时记录的日期 · 金额自动保存</span>
+            <span>仅展示有计薪记录的日期 · 金额自动保存</span>
             <span class="records-foot-note">删除记录不可恢复</span>
           </div>
+        </section>
+      </section>
+
+      <!-- SU7 心愿与记账 -->
+      <section class="view" id="view-wishlist" data-view-panel="wishlist" aria-labelledby="wishlistHeading" hidden>
+        <div class="view-heading wishlist-heading">
+          <div>
+            <p class="eyebrow"><span>SU7 WISH LIST</span><span class="eyebrow-separator"></span><span>每日记账 · AI 教练</span></p>
+            <h1 id="wishlistHeading">把每一秒，<span class="heading-emphasis"><span class="brush-text">攒成想要的车。</span></span></h1>
+          </div>
+          <div class="heading-aside">
+            <p class="heading-note">工资自动入账 · 支出实时扣减</p>
+          </div>
+        </div>
+
+        <section class="wishlist-hero" aria-label="小米 SU7 心愿单">
+          <img class="wishlist-hero-image" src="assets/su7.jpg" alt="小米 SU7 雅灰，侧面展示" fetchpriority="high">
+          <div class="wishlist-hero-shade" aria-hidden="true"></div>
+          <div class="wishlist-hero-content">
+            <span class="wishlist-badge">XIAOMI SU7 · 我的心愿单</span>
+            <h2 id="wishlistTitle">小米 SU7</h2>
+            <p class="wishlist-subtitle" id="wishlistSubtitle">雅灰 · 20英寸梅花轮毂 · 砂陶米</p>
+            <div class="wishlist-specs">
+              <span><b>670</b>km<small>CLTC 续航</small></span>
+              <span><b>320</b>PS<small>最大马力</small></span>
+              <span><b>HAD</b><small>小米辅助驾驶</small></span>
+            </div>
+          </div>
+          <div class="wishlist-hero-price">
+            <span>目标价</span>
+            <strong id="wishlistHeroTarget">¥235,900.00</strong>
+            <small>已攒 <b id="wishlistHeroSaved">¥0.00</b></small>
+          </div>
+        </section>
+
+        <div class="wishlist-stats">
+          <article class="wishlist-stat is-primary">
+            <span>已攒金额</span>
+            <strong id="wishlistSaved">¥0.00</strong>
+            <small>工资 + 其他收入 − 支出</small>
+          </article>
+          <article class="wishlist-stat">
+            <span>距离目标还差</span>
+            <strong id="wishlistGap">¥235,900.00</strong>
+            <small id="wishlistGapSub">从第一笔工资开始</small>
+          </article>
+          <article class="wishlist-stat">
+            <span>完成度</span>
+            <strong id="wishlistProgress">0%</strong>
+            <div class="mini-progress" aria-hidden="true"><span id="wishlistProgressFill"></span></div>
+            <small id="wishlistProgressSub">目标 ¥235,900.00</small>
+          </article>
+          <article class="wishlist-stat">
+            <span>按最近节奏</span>
+            <strong id="wishlistEta">—</strong>
+            <small id="wishlistEtaSub">记账后会给出预测</small>
+          </article>
+        </div>
+
+        <div class="wishlist-main-grid">
+          <section class="panel ledger-panel" aria-labelledby="ledgerHeading">
+            <div class="panel-heading">
+              <div>
+                <p class="panel-eyebrow">DAILY LEDGER</p>
+                <h2 id="ledgerHeading">每日记账</h2>
+              </div>
+              <div class="ledger-summary">
+                <span>本月支出 <b id="ledgerMonthExpense">¥0.00</b></span>
+                <span>本月收入 <b id="ledgerMonthIncome">¥0.00</b></span>
+                <span>本月结余 <b id="ledgerMonthNet">¥0.00</b></span>
+              </div>
+            </div>
+
+            <form class="ledger-form" id="ledgerForm" novalidate>
+              <div class="ledger-form-row">
+                <label class="ledger-field">
+                  <span>日期</span>
+                  <input class="text-input" id="ledgerDate" type="date" aria-label="记账日期">
+                </label>
+                <div class="ledger-field">
+                  <span>类型</span>
+                  <div class="segmented" role="group" aria-label="收支类型">
+                    <label><input id="ledgerTypeExpense" type="radio" name="ledgerType" value="expense" checked><span>支出</span></label>
+                    <label><input id="ledgerTypeIncome" type="radio" name="ledgerType" value="income"><span>收入</span></label>
+                  </div>
+                </div>
+                <label class="ledger-field">
+                  <span>分类</span>
+                  <select class="text-input" id="ledgerCategory" aria-label="记账分类"></select>
+                </label>
+                <label class="ledger-field ledger-amount-field">
+                  <span>金额</span>
+                  <div class="money-field is-compact">
+                    <span class="money-prefix">¥</span>
+                    <input class="text-input money-input" id="ledgerAmount" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" autocomplete="off" aria-describedby="ledgerError">
+                  </div>
+                </label>
+              </div>
+              <div class="ledger-form-row is-note-row">
+                <label class="ledger-field ledger-note-field">
+                  <span>备注</span>
+                  <input class="text-input" id="ledgerNote" type="text" maxlength="120" placeholder="例如：中午外卖、地铁、奶茶…" autocomplete="off">
+                </label>
+                <button class="button button-gold ledger-submit" id="ledgerSubmitBtn" type="submit">记一笔</button>
+              </div>
+              <p class="field-error" id="ledgerError" hidden></p>
+            </form>
+
+            <div class="ledger-list-head">
+              <span>最近记录</span>
+              <span id="ledgerCount">0 笔</span>
+            </div>
+            <div class="ledger-list" id="ledgerList"></div>
+            <div class="ledger-empty" id="ledgerEmpty">
+              <strong>还没有记账</strong>
+              <p>记下第一笔支出，AI 教练会开始帮你盯住目标。</p>
+            </div>
+          </section>
+
+          <aside class="panel ai-panel" aria-labelledby="aiHeading">
+            <div class="ai-panel-head">
+              <div class="ai-orb" aria-hidden="true"><span>AI</span></div>
+              <div>
+                <p class="panel-eyebrow">AI FINANCIAL COACH</p>
+                <h2 id="aiHeading">AI 财务教练</h2>
+              </div>
+              <span class="ai-live" id="aiStatus">本地智能分析</span>
+            </div>
+            <div class="ai-insights" id="aiInsights"></div>
+            <div class="ai-foot">
+              <span>默认只在本机分析；深度分析仅发送汇总数字</span>
+              <div class="ai-foot-actions">
+                <button class="text-button" id="aiDeepBtn" type="button">AI 深度分析 <span aria-hidden="true">✦</span></button>
+                <button class="text-button" id="aiRefreshBtn" type="button">刷新 <span aria-hidden="true">↻</span></button>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <section class="panel wishlist-config" aria-labelledby="wishlistConfigHeading">
+          <div>
+            <p class="panel-eyebrow">GOAL SETTINGS</p>
+            <h2 id="wishlistConfigHeading">调整心愿目标</h2>
+            <p>目标价默认按图片中的 SU7 配置合计 ¥235,900；也可以填入自己的落地价或首付目标。</p>
+          </div>
+          <form class="wishlist-config-form" id="wishlistConfigForm" novalidate>
+            <label class="ledger-field">
+              <span>目标金额</span>
+              <div class="money-field is-compact">
+                <span class="money-prefix">¥</span>
+                <input class="text-input money-input" id="wishlistTargetInput" type="number" inputmode="decimal" min="0.01" step="0.01" aria-describedby="wishlistConfigError">
+              </div>
+            </label>
+            <label class="ledger-field">
+              <span>已有存款</span>
+              <div class="money-field is-compact">
+                <span class="money-prefix">¥</span>
+                <input class="text-input money-input" id="wishlistInitialInput" type="number" inputmode="decimal" min="0" step="0.01" aria-describedby="wishlistConfigError">
+              </div>
+            </label>
+            <button class="button button-ghost is-small" id="wishlistSaveBtn" type="submit">保存目标</button>
+            <p class="field-error" id="wishlistConfigError" hidden></p>
+            <p class="config-status" id="wishlistConfigStatus">目标会自动同步到共享空间</p>
+          </form>
         </section>
       </section>
 
@@ -478,7 +640,7 @@
                     <input class="text-input" id="settingsEnd" type="time" step="60" aria-label="默认工作结束时间">
                   </label>
                 </div>
-                <p class="field-hint">支持跨天，例如 22:00 至次日 06:00。今日已有计时时，只影响之后新的一天。</p>
+                <p class="field-hint">支持跨天，例如 22:00 至次日 06:00。今日已有计薪进度时，只影响之后新的一天。</p>
                 <p class="field-error" id="settingsTimeError" hidden></p>
 
                 <div class="break-config">
@@ -591,7 +753,7 @@
               </span>
               <div>
                 <h2>本地数据</h2>
-                <p>当前浏览器共保存 <strong id="localRecordCount">0</strong> 条日工资记录。清空后设置、今日进度与历史记录都会删除。</p>
+                <p>当前浏览器共保存 <strong id="localRecordCount">0</strong> 条日工资记录。清空后设置、今日计薪进度、心愿账本与历史记录都会删除。</p>
               </div>
             </div>
             <button class="button button-danger" id="clearDataBtn" type="button">清空本地数据</button>
@@ -601,7 +763,7 @@
     </main>
 
     <footer class="site-footer">
-      <div class="footer-brand"><span class="footer-mark">秒</span><span>秒薪 · 一寸光阴一寸金</span></div>
+      <div class="footer-brand"><span class="footer-mark">秒</span><span>秒薪 · SU7 心愿工资簿</span></div>
       <p>本机优先保存；开启共享后仅同步端到端加密的密文到 KVdb。</p>
     </footer>
   </div>
@@ -730,6 +892,7 @@
   <script src="js/wage.js" defer></script>
   <script src="js/storage.js" defer></script>
   <script src="js/cloud.js" defer></script>
+  <script src="js/ai.js" defer></script>
   <script src="js/app.js" defer></script>
 </body>
 </html>

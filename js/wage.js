@@ -420,6 +420,120 @@
     };
   }
 
+  function dateTimeMs(dateKey, time) {
+    const parsed = parseDateKey(dateKey);
+    const minutes = parseTime(time);
+    if (!parsed || minutes === null) return null;
+    return new Date(
+      parsed.year,
+      parsed.month - 1,
+      parsed.day,
+      Math.floor(minutes / 60),
+      minutes % 60,
+      0,
+      0
+    ).getTime();
+  }
+
+  function parsePauseIntervals(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.map(function (item) {
+      const start = Date.parse(item && item.start);
+      const end = item && item.end ? Date.parse(item.end) : null;
+      if (!Number.isFinite(start)) return null;
+      return {
+        start: start,
+        end: Number.isFinite(end) ? Math.max(start, end) : null
+      };
+    }).filter(Boolean).sort(function (a, b) { return a.start - b.start; });
+  }
+
+  function subtractPauses(segmentStart, segmentEnd, pauses, nowMs) {
+    if (segmentEnd <= segmentStart) return 0;
+    let paused = 0;
+    pauses.forEach(function (pause) {
+      const pauseEnd = pause.end === null ? nowMs : pause.end;
+      const overlap = Math.max(0, Math.min(segmentEnd, pauseEnd) - Math.max(segmentStart, pause.start));
+      paused += overlap;
+    });
+    return Math.max(0, segmentEnd - segmentStart - paused);
+  }
+
+  /**
+   * 自动计薪：根据班次时钟计算截至 nowMs 的计薪秒数。
+   * 不依赖页面是否可见；暂停区间会从标准/加班时长中扣除。
+   */
+  function autoWork(config, dateKey, nowMs, pauseIntervals) {
+    const info = scheduleInfo(config.workStart, config.workEnd, {
+      enabled: Boolean(config.breakEnabled),
+      start: config.breakStart,
+      end: config.breakEnd
+    });
+    if (!info.ok) return null;
+
+    const parsed = parseDateKey(dateKey);
+    if (!parsed) return null;
+    const now = Number(nowMs) || Date.now();
+    const dayStart = new Date(parsed.year, parsed.month - 1, parsed.day, 0, 0, 0, 0).getTime();
+    const shiftStart = dayStart + info.startMinutes * 60000;
+    const shiftEnd = dayStart + info.endAbsoluteMinutes * 60000;
+    const breakStart = info.breakEnabled ? dayStart + info.breakStartMinutes * 60000 : null;
+    const breakEnd = info.breakEnabled ? dayStart + info.breakEndMinutes * 60000 : null;
+    const pauses = parsePauseIntervals(pauseIntervals);
+    const isPaused = pauses.some(function (pause) {
+      return pause.end === null || (now >= pause.start && now < pause.end);
+    });
+
+    const segments = info.breakEnabled
+      ? [[shiftStart, breakStart], [breakEnd, shiftEnd]]
+      : [[shiftStart, shiftEnd]];
+
+    let standardMs = 0;
+    segments.forEach(function (segment) {
+      const segmentEnd = Math.min(segment[1], now);
+      if (segmentEnd > segment[0]) {
+        standardMs += subtractPauses(segment[0], segmentEnd, pauses, now);
+      }
+    });
+
+    const standardTotalSeconds = info.seconds;
+    let standardSeconds = Math.floor(standardMs / 1000);
+    standardSeconds = Math.min(standardSeconds, standardTotalSeconds);
+
+    const overtimeCapMs = 8 * 3600 * 1000;
+    let overtimeSeconds = 0;
+    if (config.overtimeEnabled && now > shiftEnd) {
+      const otEnd = Math.min(now, shiftEnd + overtimeCapMs);
+      const otMs = subtractPauses(shiftEnd, otEnd, pauses, now);
+      overtimeSeconds = Math.min(8 * 3600, Math.floor(otMs / 1000));
+    }
+
+    let phase = "working";
+    if (isPaused) phase = "paused";
+    else if (now < shiftStart) phase = "before";
+    else if (info.breakEnabled && now >= breakStart && now < breakEnd) phase = "break";
+    else if (now >= shiftEnd) {
+      phase = config.overtimeEnabled && now < shiftEnd + overtimeCapMs ? "overtime" : "off";
+    }
+
+    return {
+      dateKey: dateKey,
+      phase: phase,
+      isPaused: isPaused,
+      shiftStartMs: shiftStart,
+      shiftEndMs: shiftEnd,
+      breakStartMs: breakStart,
+      breakEndMs: breakEnd,
+      standardSeconds: standardSeconds,
+      overtimeSeconds: overtimeSeconds,
+      totalSeconds: standardSeconds + overtimeSeconds,
+      standardTotalSeconds: standardTotalSeconds,
+      standardMs: standardMs,
+      overtimeMs: overtimeSeconds * 1000,
+      capReached: config.overtimeEnabled && now >= shiftEnd + overtimeCapMs
+    };
+  }
+
   function currentMonthKey(date) {
     const target = date instanceof Date ? date : new Date();
     return target.getFullYear() + "-" + pad2(target.getMonth() + 1);
@@ -461,6 +575,9 @@
     parseDateKey: parseDateKey,
     parseTime: parseTime,
     minutesToTime: minutesToTime,
+    dateTimeMs: dateTimeMs,
+    parsePauseIntervals: parsePauseIntervals,
+    autoWork: autoWork,
     scheduleInfo: scheduleInfo,
     suggestBreak: suggestBreak,
     formatDuration: formatDuration,
