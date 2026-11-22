@@ -515,6 +515,35 @@ input[type="date"].text-input, input[type="time"].text-input, input[type="month"
 .danger-copy h2 { font-size: 14px; font-weight: 560; }
 .danger-copy p { margin-top: 2px; color: var(--muted-2); font-size: 9.5px; }
 .danger-copy strong { color: var(--muted); }
+.install-card { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px 20px; border: 1px solid rgba(232,178,94,.2); border-radius: 14px; background: linear-gradient(120deg,rgba(232,178,94,.08),rgba(255,255,255,.015)); }
+.install-copy { display: flex; align-items: flex-start; gap: 12px; }
+.install-icon { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid rgba(232,178,94,.25); border-radius: 9px; background: var(--gold-dim); color: var(--gold); flex: 0 0 auto; }
+.install-icon svg { width: 18px; height: 18px; }
+.install-card h2 { margin-top: 3px; font-size: 15px; font-weight: 580; }
+.install-card p { margin-top: 3px; color: var(--muted); font-size: 9.5px; line-height: 1.55; }
+.install-card .install-note { color: var(--muted-2); font-size: 8.5px; }
+.install-badge { flex: 0 0 auto; padding: 5px 8px; border: 1px solid rgba(123,216,165,.2); border-radius: 5px; background: var(--green-dim); color: var(--green); font-size: 8px; white-space: nowrap; }
+.is-standalone .install-card { display: none; }
+@supports (padding: max(0px)) {
+  body { padding-bottom: env(safe-area-inset-bottom); }
+  .app-shell { padding-left: max(32px, env(safe-area-inset-left)); padding-right: max(32px, env(safe-area-inset-right)); }
+}
+@media (max-width: 960px) {
+  @supports (padding: max(0px)) {
+    .app-shell { padding-left: max(22px, env(safe-area-inset-left)); padding-right: max(22px, env(safe-area-inset-right)); }
+  }
+}
+@media (max-width: 760px) {
+  @supports (padding: max(0px)) {
+    .app-shell { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+  }
+  .install-card { flex-direction: column; align-items: flex-start; }
+}
+@media (max-width: 390px) {
+  @supports (padding: max(0px)) {
+    .app-shell { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+  }
+}
 
 /* Dialogs */
 dialog { border: 0; padding: 0; background: transparent; color: var(--text); }

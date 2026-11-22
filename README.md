@@ -117,6 +117,37 @@ python -m http.server 8848
 
 启动后打开 <http://127.0.0.1:8848>。
 
+## 安装到 iPhone（推荐，不需要 App Store）
+
+项目已经内置 PWA：主屏幕图标、全屏启动、离线应用外壳和原有云端同步。
+
+1. 用 **Safari** 打开 <https://xhzc66.github.io/secondsalary/>。
+2. 点击底部「分享」按钮。
+3. 选择「添加到主屏幕」→ 确认添加。
+4. 从主屏幕打开「秒薪」，第一次如果显示未连接共享空间，点右上角「共享」，用原邀请链接 + 口令 + 同一个称呼登录一次。
+
+之后它会像 App 一样从主屏幕启动。工资、心愿单和账本仍通过原来的加密共享空间同步。
+
+### 关于 iPhone 上的 PWA
+
+- **主屏幕 App 和 Safari 的本地存储可能相互独立**，所以第一次从主屏幕打开时可能需要重新登录共享空间；云端数据不会丢。
+- **完全关闭 App 时不会持续联网**。重新打开后会按当前时钟补算工资，并在联网后同步；自动计薪和跨天结算不依赖后台常驻。
+- 离线时可以打开应用外壳、查看本机数据和继续记账；联网后自动重试共享同步。
+- 如果希望「关闭后仍在后台推送通知/实时同步」，那需要原生 App 的后台能力或服务端推送，PWA 做不到持续后台运行。
+- 以后更新静态资源时，把 `sw.js` 里的 `CACHE_NAME` 版本号加一，主屏幕 App 下次打开会拉取新版缓存。
+
+### 想上架 App Store 的话
+
+当前 Windows 环境无法直接产出签名 iOS 安装包。可行路线是用 Capacitor 把同一套静态页面包进 WKWebView：
+
+```text
+macOS + Xcode + Apple Developer（$99/年）
+→ npx cap add ios
+→ Xcode 签名 / TestFlight / App Store 审核
+```
+
+网页版和共享同步逻辑可以原样复用；但原生包需要处理 App Store 审核、隐私声明、图标/启动图和签名。对于「自己随时用」这个目标，先安装 PWA 最省事，也已经有联网同步。
+
 ## 部署到 GitHub Pages
 
 项目是纯静态站点，根目录包含 `.nojekyll`。
@@ -140,12 +171,16 @@ secondsalary/
 ├─ styles.css          深色汽车产品页视觉与响应式
 ├─ assets/
 │  └─ su7.jpg          从参考配置单裁切的小米 SU7 图片
+├─ icons/              PWA 主屏幕与 Apple Touch 图标
 ├─ js/
 │  ├─ wage.js          时间/金额解析、自动计薪核心、格式化
 │  ├─ storage.js       默认配置、localStorage、数据校验与迁移
 │  ├─ cloud.js         PBKDF2 / AES-GCM、KVdb 同步、成员合并
 │  ├─ ai.js            本地 AI 财务分析与可选在线建议
+│  ├─ pwa.js           Service Worker 注册与主屏幕模式标记
 │  └─ app.js           自动计薪、渲染、心愿单、账本、交互
+├─ manifest.webmanifest  PWA 清单
+├─ sw.js               PWA 离线缓存与更新
 ├─ screenshots/        预览截图
 ├─ .nojekyll           GitHub Pages 原样发布标记
 ├─ .gitignore

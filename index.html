@@ -2,8 +2,16 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0a0a0b">
+  <meta name="color-scheme" content="dark">
+  <meta name="application-name" content="秒薪">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="秒薪">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="description" content="按秒自动计薪、SU7 心愿单、每日记账与 AI 财务教练。支持休息日、加班费、月度总览和多人加密共享。">
   <title>秒薪 · SU7 心愿工资簿</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0b'/%3E%3Crect x='2' y='2' width='60' height='60' rx='12' fill='none' stroke='%23e8b15c' stroke-opacity='.7'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-size='32' font-family='Arial,sans-serif' font-weight='700' fill='%23f4f1ea'%3E%E7%A7%92%3C/text%3E%3C/svg%3E">
@@ -758,6 +766,21 @@
             </div>
             <button class="button button-danger" id="clearDataBtn" type="button">清空本地数据</button>
           </section>
+
+          <section class="install-card">
+            <div class="install-copy">
+              <span class="install-icon" aria-hidden="true">
+                <svg viewBox="0 0 22 22" fill="none"><rect x="6" y="2.5" width="10" height="17" rx="2.3" stroke="currentColor" stroke-width="1.5"/><path d="M9 18h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <p class="panel-eyebrow">INSTALL TO HOME SCREEN</p>
+                <h2>安装到 iPhone / Android</h2>
+                <p>iPhone：用 Safari 打开本页 → 点「分享」→「添加到主屏幕」。Android：用 Chrome 菜单 →「安装应用」。</p>
+                <p class="install-note">安装后首次打开若未连接共享空间，请用原邀请链接和口令再登录一次；主屏幕 App 与 Safari 的本地存储可能相互独立。之后工资、心愿单和账本会继续加密同步。</p>
+              </div>
+            </div>
+            <span class="install-badge">PWA · 可离线打开</span>
+          </section>
         </form>
       </section>
     </main>
@@ -894,5 +917,6 @@
   <script src="js/cloud.js" defer></script>
   <script src="js/ai.js" defer></script>
   <script src="js/app.js" defer></script>
+  <script src="js/pwa.js" defer></script>
 </body>
 </html>

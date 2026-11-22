@@ -1,0 +1,88 @@
+{
+  "name": "秒薪 · SU7 心愿工资簿",
+  "short_name": "秒薪",
+  "description": "自动计薪、小米 SU7 心愿单、每日记账、AI 财务教练与多人加密同步。",
+  "lang": "zh-CN",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#08090a",
+  "theme_color": "#08090a",
+  "categories": [
+    "finance",
+    "productivity"
+  ],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "今日自动计薪",
+      "short_name": "今日计薪",
+      "url": "./#today",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "SU7 心愿与记账",
+      "short_name": "SU7 心愿",
+      "url": "./#wishlist",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/dark-home.png",
+      "sizes": "1440x1292",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "今日自动计薪"
+    },
+    {
+      "src": "screenshots/dark-wishlist.png",
+      "sizes": "1440x1581",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "SU7 心愿与 AI 教练"
+    },
+    {
+      "src": "screenshots/dark-mobile.png",
+      "sizes": "390x2056",
+      "type": "image/png",
+      "label": "移动端今日计薪"
+    }
+  ]
+}
